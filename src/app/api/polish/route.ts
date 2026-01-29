@@ -21,14 +21,44 @@ export async function POST(request: Request) {
     // For now, we'll use a simple text-only model
     const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
-    // Construct the prompt based on mode and extra instruction
-    let prompt = `以下のメモを「${mode}」の形式で清書してください。\n\n`;
-    if (extraInstruction) {
-      prompt += `追加の指示: ${extraInstruction}\n\n`;
+    // Define mode-specific instructions
+    let modeInstruction = "";
+    switch (mode) {
+      case "request_line":
+        modeInstruction = "以下のメモを、丁寧で簡潔な依頼文に清書してください。相手に明確に伝わるように、要点をまとめ、不必要な情報は省いてください。";
+        break;
+      case "summarize":
+        modeInstruction = "以下のメモの要点を抽出し、簡潔に要約してください。重要な情報を見落とさず、全体の内容が把握できるようにまとめてください。";
+        break;
+      case "bulletize":
+        modeInstruction = "以下のメモの内容を、分かりやすい箇条書き形式で整理してください。各項目は簡潔にし、関連する内容はグループ化してください。";
+        break;
+      case "tasks":
+        modeInstruction = "以下のメモから、具体的な行動を伴うTODOタスクを抽出し、リスト形式で出力してください。各タスクは明確で実行可能な内容にしてください。";
+        break;
+      default:
+        modeInstruction = "以下のメモを、読みやすく自然な文章に清書してください。"; // Fallback
     }
-    prompt += `メモ:\n${text}`;
 
-    const result = await model.generateContent(prompt);
+    // Construct the full prompt
+    let fullPrompt = `あなたはプロの編集者です。以下の指示に従って、ユーザーのメモを清書してください。
+
+# 指示
+- 読みやすさを最優先してください。
+- 必要に応じて見出しや箇条書きを使用してください。
+- 事実の創作は絶対にしないでください。ユーザーのメモにない情報を追加しないでください。
+- 不明な点がある場合は、「要確認」と明記してください。
+
+# 清書モード
+${modeInstruction}
+
+${extraInstruction ? `# 追加の指示\n${extraInstruction}\n` : ''}
+
+# ユーザーのメモ
+${text}
+`;
+
+    const result = await model.generateContent(fullPrompt);
     const response = await result.response;
     const output = response.text();
 
