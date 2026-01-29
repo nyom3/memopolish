@@ -120,7 +120,7 @@ export default function PolishForm() {
           id="output-area"
           rows={10}
           readOnly
-          className="p-2 border rounded bg-gray-100"
+          className={`p-2 border rounded ${status === 'error' ? 'border-red-500 bg-red-50' : 'bg-gray-100'}`}
           placeholder="ここに清書結果が表示されます..."
           value={output}
         />

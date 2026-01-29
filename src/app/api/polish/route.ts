@@ -13,6 +13,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Text is required.' }, { status: 400 });
     }
 
+    const MAX_INPUT_LENGTH = 5000; // Define maximum input length
+    if (text.length > MAX_INPUT_LENGTH) {
+      return NextResponse.json({ error: `Input text exceeds the maximum allowed length of ${MAX_INPUT_LENGTH} characters.` }, { status: 400 });
+    }
+
     const allowedModes = ["request_line", "summarize", "bulletize", "tasks"];
     if (!mode || typeof mode !== 'string' || !allowedModes.includes(mode)) {
       return NextResponse.json({ error: `Invalid mode. Allowed modes are: ${allowedModes.join(', ')}` }, { status: 400 });
@@ -63,12 +68,29 @@ ${text}
     const output = response.text();
 
     return NextResponse.json({ output });
-  } catch (error) {
+  } catch (error: any) { // Explicitly type error as 'any' for easier inspection
     console.error('API error:', error);
-    // Check if the error is related to API key or rate limits
-    if (error instanceof Error && error.message.includes('API key not valid')) {
-      return NextResponse.json({ error: 'Gemini API key is not valid. Please check your .env.local file.' }, { status: 500});
+    
+    let errorMessage = 'Internal Server Error';
+    let statusCode = 500;
+
+    if (error instanceof Error) {
+      if (error.message.includes('API key not valid')) {
+        errorMessage = 'Gemini API key is not valid. Please check your .env.local file.';
+      } else if (error.message.includes('quota exceeded')) {
+        errorMessage = 'Gemini API quota exceeded. Please try again later or check your usage limits.';
+        statusCode = 429; // Too Many Requests
+      } else if (error.message.includes('safety settings')) {
+        errorMessage = 'The content violates safety guidelines. Please revise your input.';
+        statusCode = 400;
+      } else if (error.message.includes('bad request')) {
+        errorMessage = 'Bad request to Gemini API. Please check your input.';
+        statusCode = 400;
+      } else {
+        errorMessage = `Gemini API error: ${error.message}`;
+      }
     }
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+
+    return NextResponse.json({ error: errorMessage }, { status: statusCode });
   }
 }
