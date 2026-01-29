@@ -15,22 +15,33 @@ export default function PolishForm() {
 
   const modes: Mode[] = ["request_line", "summarize", "bulletize", "tasks"];
 
-  const handlePolish = () => {
-    console.log("Polishing with:", { text, mode, extraInstruction });
+  const handlePolish = async () => {
     setStatus("loading");
     setOutput("");
 
-    // Simulate API call
-    setTimeout(() => {
-      if (text.trim() === "") {
-        setOutput("エラー: メモが入力されていません。");
-        setStatus("error");
-      } else {
-        const dummyOutput = `これは「${mode}」モードでの清書結果のダミーです。\n\n元の文字数: ${text.length}`;
-        setOutput(dummyOutput);
+    try {
+      const response = await fetch('/api/polish', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text, mode, extraInstruction }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setOutput(data.output);
         setStatus("success");
+      } else {
+        setOutput(`エラー: ${data.error || '不明なエラーが発生しました。'}`);
+        setStatus("error");
       }
-    }, 1500);
+    } catch (error) {
+      console.error("Failed to fetch from API:", error);
+      setOutput("エラー: APIとの通信に失敗しました。");
+      setStatus("error");
+    }
   };
 
   const handleCopy = () => {
