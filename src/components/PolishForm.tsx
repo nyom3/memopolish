@@ -11,7 +11,7 @@ export default function PolishForm() {
   const [extraInstruction, setExtraInstruction] = useState("");
   const [output, setOutput] = useState("");
   const [status, setStatus] = useState<Status>("idle");
-  const [copyButtonText, setCopyButtonText] = useState("Copy to Clipboard");
+  const [copyButtonText, setCopyButtonText] = useState("クリップボードにコピー");
 
   const modes: Mode[] = ["request_line", "summarize", "bulletize", "tasks"];
 
@@ -23,10 +23,10 @@ export default function PolishForm() {
     // Simulate API call
     setTimeout(() => {
       if (text.trim() === "") {
-        setOutput("Error: Input memo cannot be empty.");
+        setOutput("エラー: メモが入力されていません。");
         setStatus("error");
       } else {
-        const dummyOutput = `This is a polished version of your memo in "${mode}" mode.\n\nOriginal length: ${text.length}`;
+        const dummyOutput = `これは「${mode}」モードでの清書結果のダミーです。\n\n元の文字数: ${text.length}`;
         setOutput(dummyOutput);
         setStatus("success");
       }
@@ -36,12 +36,12 @@ export default function PolishForm() {
   const handleCopy = () => {
     if (output) {
       navigator.clipboard.writeText(output).then(() => {
-        setCopyButtonText("Copied!");
-        setTimeout(() => setCopyButtonText("Copy to Clipboard"), 2000);
+        setCopyButtonText("コピーしました！");
+        setTimeout(() => setCopyButtonText("クリップボードにコピー"), 2000);
       }).catch(err => {
         console.error("Failed to copy text: ", err);
-        setCopyButtonText("Failed to copy");
-        setTimeout(() => setCopyButtonText("Copy to Clipboard"), 2000);
+        setCopyButtonText("コピー失敗");
+        setTimeout(() => setCopyButtonText("クリップボードにコピー"), 2000);
       });
     }
   };
@@ -50,19 +50,19 @@ export default function PolishForm() {
     <div className="w-full max-w-2xl">
       <div className="flex flex-col space-y-4">
         {/* Input Text Area */}
-        <label htmlFor="memo-input" className="font-bold">Your Memo:</label>
+        <label htmlFor="memo-input" className="font-bold">あなたのメモ:</label>
         <textarea
           id="memo-input"
           rows={10}
           className="p-2 border rounded"
-          placeholder="Enter your rough memo here..."
+          placeholder="ここに雑なメモを入力してください..."
           value={text}
           onChange={(e) => setText(e.target.value)}
           disabled={status === 'loading'}
         />
 
         {/* Mode Selection */}
-        <label htmlFor="mode-select" className="font-bold">Mode:</label>
+        <label htmlFor="mode-select" className="font-bold">モード:</label>
         <select 
           id="mode-select" 
           className="p-2 border rounded"
@@ -76,12 +76,12 @@ export default function PolishForm() {
         </select>
 
         {/* Extra Instruction */}
-        <label htmlFor="extra-instruction" className="font-bold">Extra Instruction (Optional):</label>
+        <label htmlFor="extra-instruction" className="font-bold">追加の指示（任意）:</label>
         <input
           id="extra-instruction"
           type="text"
           className="p-2 border rounded"
-          placeholder="e.g., Make it friendly"
+          placeholder="例：丁寧な言葉遣いで"
           value={extraInstruction}
           onChange={(e) => setExtraInstruction(e.target.value)}
           disabled={status === 'loading'}
@@ -94,23 +94,23 @@ export default function PolishForm() {
             className="flex-1 bg-blue-500 text-white font-bold py-2 px-4 rounded hover:bg-blue-700 disabled:bg-blue-300"
             disabled={status === 'loading'}
           >
-            {status === 'loading' ? 'Polishing...' : 'Polish'}
+            {status === 'loading' ? '清書中...' : '清書'}
           </button>
         </div>
 
         {/* Status Display */}
         <div className="text-center p-2">
-          Status: {status}
+          ステータス: {status}
         </div>
 
         {/* Output Text Area */}
-        <label htmlFor="output-area" className="font-bold">Polished Memo:</label>
+        <label htmlFor="output-area" className="font-bold">清書後のメモ:</label>
         <textarea
           id="output-area"
           rows={10}
           readOnly
           className="p-2 border rounded bg-gray-100"
-          placeholder="Polished output will appear here..."
+          placeholder="ここに清書結果が表示されます..."
           value={output}
         />
         
