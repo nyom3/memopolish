@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     }
 
     // For now, we'll use a simple text-only model
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-pro-latest" });
 
     // Define mode-specific instructions
     let modeInstruction = "";
