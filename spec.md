@@ -161,7 +161,7 @@
 ## 11. 技術要件
 - **フレームワーク**: Next.js (App Router)
 - **ランタイム**: Node.js
-- **AI**: Gemini API（無料枠を想定）
+- **AI**: Gemini API（gemini-2.5-flash、無料枠想定）
 - **デプロイ先**: Vercel
 - **認証**: APIキーを環境変数で管理
 
