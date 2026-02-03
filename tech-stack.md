@@ -1,48 +1,27 @@
-# memopolish 技術スタック
+﻿# memopolish 技術スタック
 
-この文書は、`memopolish` で使っている技術を「何のために使うのか」まで含めて分かりやすくまとめたものです。  
-専門用語はできるだけ噛み砕いて説明しています。
+この文書は `memopolish` の技術構成を分かりやすくまとめたものです。
 
-## コア技術（アプリの土台）
+## コア技術
 
-- **フレームワーク**: Next.js (v16.1.6)  
-  Webアプリを作るための土台です。ページの表示やデータのやり取りをまとめて管理でき、開発が速くなります。
-- **言語**: TypeScript (v5)  
-  JavaScriptに「型（入力の形のルール）」を追加した言語です。間違いを早めに見つけられるので安全です。
-- **UIライブラリ**: React (v19.2.3)  
-  画面の部品（ボタンやカードなど）を組み合わせて作るための仕組みです。見た目の再利用がしやすくなります。
+- **Framework**: Next.js (v16.1.6)
+- **Language**: TypeScript (v5)
+- **UI Library**: React (v19.2.3)
 
-## 主要ライブラリと役割
+## 主要ライブラリ
 
-- **AI連携**:
-  - `@google/generative-ai`  
-    Googleの生成AIを使うための公式ライブラリです。AIに質問したり、文章の生成を行う部分で使います。
+- **AI**: `@google/generative-ai`（Gemini API）
+- **DB / Storage**: `@supabase/supabase-js`（Supabase）
+- **Styling**: Tailwind CSS (v4)
+- **Lint**: ESLint + eslint-config-next
 
-- **デザイン・見た目**:
-  - Tailwind CSS (v4)  
-    CSSを「小さな部品の組み合わせ」で書く方法です。  
-    例: `text-sm` のような短い指定で文字サイズを決められるため、見た目の調整が素早くできます。
+## サーバ構成
 
-- **コードの品質チェック**:
-  - ESLint  
-    書き方のミスや分かりにくい書き方を見つける道具です。  
-  - `eslint-config-next`  
-    Next.js向けのおすすめルール集です。プロジェクトの書き方を揃えやすくなります。
+- Next.js Route Handler で API を実装
+- 削除/cleanup はサーバ側で service role key を使用
 
-## 開発・ビルド（動かし方の基礎）
+## 開発・ビルド
 
-- **開発サーバー**: `next dev`  
-  開発中にアプリを動かして確認するためのコマンドです。変更がすぐ反映されます。
-- **本番ビルド**: `next build`  
-  公開用に最適化したファイルを作るコマンドです。速度やサイズが整います。
-- **パッケージ管理**: npm  
-  ライブラリの追加や更新を行うための仕組みです。`package-lock.json` から利用が分かります。
-
-## ざっくり全体像
-
-- Next.jsが「アプリの骨組み」
-- Reactが「画面の部品づくり」
-- TypeScriptが「安全性の確保」
-- Tailwind CSSが「見た目の調整」
-- ESLintが「品質チェック」
-- AI連携は `@google/generative-ai` が担当
+- 開発サーバー: `next dev`
+- 本番ビルド: `next build`
+- パッケージ管理: npm

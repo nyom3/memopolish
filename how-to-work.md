@@ -1,49 +1,57 @@
-# MemoPolish 開発ガイド
+﻿# 開発手順（ローカル）
 
-このドキュメントは、MemoPolishプロジェクトの開発環境のセットアップ、実行方法、および基本的なワークフローについて説明します。
+## 1. リポジトリの準備
 
-## 1. プロジェクトのセットアップ
+```bash
+git clone <REPOSITORY_URL>
+cd memopolish
+```
 
-1.  **リポジトリのクローン**:
-    ```bash
-    git clone [リポジトリのURL]
-    cd memopolish
-    ```
+## 2. 依存関係のインストール
 
-2.  **依存関係のインストール**:
-    ```bash
-    npm install
-    ```
+```bash
+npm install
+```
 
-3.  **環境変数の設定**:
-    *   プロジェクトルートに`.env.local`ファイルを作成します。
-    *   Google AI Studioから取得したGemini APIキーを以下の形式で記述します。
-        ```
-        GEMINI_API_KEY=YOUR_GEMINI_API_KEY_HERE
-        ```
-    *   `YOUR_GEMINI_API_KEY_HERE`を実際のAPIキーに置き換えてください。
+## 3. 環境変数（.env.local）
 
-## 2. 開発サーバーの実行
+```bash
+# クライアントから参照される
+NEXT_PUBLIC_SUPABASE_URL=YOUR_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
 
-プロジェクトをローカルで実行するには、以下のコマンドを使用します。
+# サーバーのみで参照される（ブラウザに出さない）
+SUPABASE_URL=YOUR_SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY=YOUR_SUPABASE_SERVICE_ROLE_KEY
+
+# Gemini API
+GEMINI_API_KEY=YOUR_GEMINI_API_KEY
+```
+
+## 4. 開発サーバー
 
 ```bash
 npm run dev
 ```
 
-サーバーが起動したら、ブラウザで `http://localhost:3000` にアクセスしてください。
+`http://localhost:3000` へアクセス。
 
-## 3. 基本的なワークフロー
+## 5. 主な確認ポイント
 
-1.  **メモの入力**: UIの「あなたのメモ:」テキストエリアに、清書したい雑なメモを入力します。
-2.  **モードの選択**: 「モード:」ドロップダウンから、清書の種類（例: `request_line`、`summarize`）を選択します。
-3.  **追加指示（任意）**: 必要に応じて、「追加の指示（任意）:」フィールドに、AIへの追加の指示を入力します。
-4.  **清書**: 「清書」ボタンをクリックすると、Gemini APIが呼び出され、メモが清書されます。
-5.  **結果の確認とコピー**: 「清書後のメモ:」に結果が表示されます。「クリップボードにコピー」ボタンで結果をコピーできます。
+- bucket_id / write_key の共有で同期できる
+- 保存/削除が write_key で保護される
+- cleanup が 200件上限を維持する
+- 期限切れが削除される
 
-## 4. ドキュメンテーション
+## 6. コーディング規約
 
-*   **`spec.md`**: プロジェクトの全体的な仕様と要件が記述されています。
-*   **`how-to-work.md`**: (このファイル) 開発環境のセットアップと基本的なワークフローについて説明します。
+- TypeScript/JavaScript を優先
+- 変数・関数は camelCase
+- コンポーネントは PascalCase
 
----
+## 7. 関連ドキュメント
+
+- `spec.md`
+- `dev-instruction.md`
+- `tech-stack.md`
+- `CHANGELOG.md`

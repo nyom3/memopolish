@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+﻿# MemoPolish / PhraseBridge
 
-## Getting Started
+MemoPolish は「PCとスマホでフレーズを共有する」ことに特化した PhraseBridge です。  
+AI 推敲は任意機能として提供します。
 
-First, run the development server:
+## 主な機能
+
+- bucket_id を使ったデバイス間同期
+- フレーズ保存・一覧表示・コピー・削除
+- 期限切れ（7日）を考慮した整理
+- AI 推敲（任意）
+
+## セットアップ
+
+1) 依存関係をインストール
+
+```bash
+npm install
+```
+
+2) 環境変数を設定（`.env.local`）
+
+```bash
+# クライアントから参照される
+NEXT_PUBLIC_SUPABASE_URL=YOUR_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
+
+# サーバーのみで参照される（ブラウザに出さない）
+SUPABASE_URL=YOUR_SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY=YOUR_SUPABASE_SERVICE_ROLE_KEY
+
+# Gemini API
+GEMINI_API_KEY=YOUR_GEMINI_API_KEY
+```
+
+3) 開発サーバー起動
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`http://localhost:3000` にアクセスします。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 仕様の要点
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- bucket_id（22文字以上）で同期
+- write_key は保存・削除用の鍵
+- write_key_hash（SHA-256）で削除・整理を保護
+- 期限切れ（created_at + 7日）は非表示、cleanupで削除
+- 200件を超える場合は古いものを削除して上限維持
 
-## Learn More
+## 開発スクリプト
 
-To learn more about Next.js, take a look at the following resources:
+- `npm run dev`
+- `npm run build`
+- `npm run start`
+- `npm run lint`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 関連ドキュメント
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `dev-instruction.md`: 開発指示とMVP方針
+- `spec.md`: 仕様（UI/データ/フロー）
+- `how-to-work.md`: 作業手順
+- `tech-stack.md`: 技術スタック
+- `CHANGELOG.md`: 変更履歴

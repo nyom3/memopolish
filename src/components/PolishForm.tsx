@@ -1,139 +1,732 @@
-"use client";
+﻿"use client";
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from "react";
 
-type Mode = "request_line" | "summarize" | "bulletize" | "tasks";
-type Status = "idle" | "loading" | "success" | "error";
+import { hasSupabaseConfig, supabaseClient } from "@/lib/supabaseClient";
 
-export default function PolishForm() {
-  const [text, setText] = useState("");
-  const [mode, setMode] = useState<Mode>("request_line");
-  const [extraInstruction, setExtraInstruction] = useState("");
-  const [output, setOutput] = useState("");
-  const [status, setStatus] = useState<Status>("idle");
-  const [copyButtonText, setCopyButtonText] = useState("クリップボードにコピー");
+type Phrase = {
+  id: string;
+  text: string;
+  created_at: string;
+  expires_at: string | null;
+};
 
-  const modes: Mode[] = ["request_line", "summarize", "bulletize", "tasks"];
+type PolishResponse = {
+  output?: string;
+  error?: string;
+};
 
-  const handlePolish = async () => {
+type ApiResponse = {
+  success?: boolean;
+  error?: string;
+};
+
+type Props = Record<string, never>;
+
+type StatusKind = "idle" | "loading" | "saving" | "polishing";
+
+const bucketStorageKey = "phrasebridge_bucket_id";
+const writeKeyStorageKey = "phrasebridge_write_key";
+const minBucketLength = 22;
+const writeKeyLength = 32;
+const maxTextLength = 2000;
+const maxPhraseCount = 200;
+const expirationDays = 7;
+
+const toBase64Url = (bytes: Uint8Array): string => {
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+};
+
+const generateRandomId = (minLength: number): string => {
+  let value = "";
+
+  while (value.length < minLength) {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    value += toBase64Url(bytes);
+  }
+
+  return value.slice(0, minLength);
+};
+
+const hashSha256 = async (value: string): Promise<string> => {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(value);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+
+  return hashArray.map((byte) => byte.toString(16).padStart(2, "0")).join("");
+};
+
+const isExpired = (expiresAt: string | null): boolean => {
+  if (!expiresAt) {
+    return false;
+  }
+
+  return new Date(expiresAt).getTime() < Date.now();
+};
+
+const isValidBucketId = (value: string): boolean => value.length >= minBucketLength;
+
+const formatDateTime = (value: string): string => {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString("ja-JP", { hour12: false });
+};
+
+const PolishForm: React.FC<Props> = () => {
+  const [text, setText] = useState<string>("");
+  const [bucketId, setBucketId] = useState<string>("");
+  const [bucketInput, setBucketInput] = useState<string>("");
+  const [writeKey, setWriteKey] = useState<string>("");
+  const [writeKeyInput, setWriteKeyInput] = useState<string>("");
+  const [writeKeyHash, setWriteKeyHash] = useState<string>("");
+  const [phrases, setPhrases] = useState<Phrase[]>([]);
+  const [polishedText, setPolishedText] = useState<string>("");
+  const [status, setStatus] = useState<StatusKind>("idle");
+  const [errorMessage, setErrorMessage] = useState<string>("");
+  const [infoMessage, setInfoMessage] = useState<string>("");
+  const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
+
+  const isBusy = status !== "idle";
+  const isReadOnly = writeKeyHash.length === 0;
+
+  const remainingChars = useMemo<number>(() => maxTextLength - text.length, [text]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const storedBucketId = localStorage.getItem(bucketStorageKey);
+    const nextBucketId =
+      storedBucketId && isValidBucketId(storedBucketId)
+        ? storedBucketId
+        : generateRandomId(minBucketLength);
+
+    if (!storedBucketId || storedBucketId !== nextBucketId) {
+      localStorage.setItem(bucketStorageKey, nextBucketId);
+    }
+
+    const storedWriteKey = localStorage.getItem(writeKeyStorageKey);
+    const nextWriteKey =
+      storedWriteKey && storedWriteKey.length >= writeKeyLength
+        ? storedWriteKey
+        : generateRandomId(writeKeyLength);
+
+    if (!storedWriteKey || storedWriteKey !== nextWriteKey) {
+      localStorage.setItem(writeKeyStorageKey, nextWriteKey);
+    }
+
+    setBucketId(nextBucketId);
+    setBucketInput(nextBucketId);
+    setWriteKey(nextWriteKey);
+    setWriteKeyInput(nextWriteKey);
+  }, []);
+
+  useEffect(() => {
+    if (!writeKey) {
+      setWriteKeyHash("");
+      return;
+    }
+
+    void (async () => {
+      try {
+        const hashed = await hashSha256(writeKey);
+        setWriteKeyHash(hashed);
+      } catch (error) {
+        console.error("Failed to hash write_key", error);
+        setErrorMessage("write_keyの生成に失敗しました。");
+      }
+    })();
+  }, [writeKey]);
+
+  useEffect(() => {
+    if (!bucketId || !hasSupabaseConfig || !supabaseClient) {
+      return;
+    }
+
+    void fetchPhrases(bucketId);
+  }, [bucketId]);
+
+  const resetMessages = (): void => {
+    setErrorMessage("");
+    setInfoMessage("");
+  };
+
+  const getApiErrorMessage = (status: number, fallback: string): string => {
+    if (status === 403) {
+      return "write_keyが一致しないため操作できません。";
+    }
+    if (status === 404) {
+      return "対象のフレーズが見つかりません。";
+    }
+    if (status >= 500) {
+      return "サーバでエラーが発生しました。時間をおいて再試行してください。";
+    }
+    return fallback;
+  };
+
+  const fetchPhrases = async (activeBucketId: string): Promise<boolean> => {
+    if (!supabaseClient || !hasSupabaseConfig) {
+      setErrorMessage("Supabaseの設定が見つかりません。");
+      return false;
+    }
+
     setStatus("loading");
-    setOutput("");
+    resetMessages();
+
+    const { data, error } = await supabaseClient
+      .from("phrases")
+      .select("id, text, created_at, expires_at")
+      .eq("bucket_id", activeBucketId)
+      .order("created_at", { ascending: false })
+      .limit(maxPhraseCount);
+
+    if (error) {
+      console.error("Failed to fetch phrases:", error);
+      setErrorMessage("フレーズの取得に失敗しました。");
+      setStatus("idle");
+      return false;
+    }
+
+    const filtered = (data ?? []).filter((phrase) => !isExpired(phrase.expires_at));
+    setPhrases(filtered);
+    setStatus("idle");
+    return true;
+  };
+
+  const cleanupOverflow = async (activeBucketId: string): Promise<boolean> => {
+    if (!writeKeyHash) {
+      setErrorMessage("write_keyが未設定のため整理できません。");
+      return false;
+    }
 
     try {
-      const response = await fetch('/api/polish', {
-        method: 'POST',
+      const response = await fetch("/api/phrases/cleanup", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify({ text, mode, extraInstruction }),
+        body: JSON.stringify({
+          bucketId: activeBucketId,
+          writeKeyHash,
+          maxPhraseCount,
+        }),
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        setOutput(data.output);
-        setStatus("success");
-      } else {
-        setOutput(`エラー: ${data.error || '不明なエラーが発生しました。'}`);
-        setStatus("error");
+      const data = (await response.json()) as ApiResponse;
+      if (!response.ok || !data.success) {
+        setErrorMessage(
+          getApiErrorMessage(
+            response.status,
+            data.error ?? "古いフレーズの整理に失敗しました。"
+          )
+        );
+        return false;
       }
+
+      return true;
     } catch (error) {
-      console.error("Failed to fetch from API:", error);
-      setOutput("エラー: APIとの通信に失敗しました。");
-      setStatus("error");
+      console.error("Failed to cleanup phrases:", error);
+      setErrorMessage("古いフレーズの整理に失敗しました。");
+      return false;
     }
   };
 
-  const handleCopy = () => {
-    if (output) {
-      navigator.clipboard.writeText(output).then(() => {
-        setCopyButtonText("コピーしました！");
-        setTimeout(() => setCopyButtonText("クリップボードにコピー"), 2000);
-      }).catch(err => {
-        console.error("Failed to copy text: ", err);
-        setCopyButtonText("コピー失敗");
-        setTimeout(() => setCopyButtonText("クリップボードにコピー"), 2000);
-      });
+  const validateText = (value: string): string | null => {
+    const trimmed = value.trim();
+
+    if (!trimmed) {
+      return "フレーズを入力してください。";
+    }
+
+    if (trimmed.length > maxTextLength) {
+      return `フレーズは${maxTextLength}文字以内で入力してください。`;
+    }
+
+    return null;
+  };
+
+  const savePhrase = async (value: string): Promise<boolean> => {
+    if (!supabaseClient || !hasSupabaseConfig) {
+      setErrorMessage("Supabaseの設定が見つかりません。");
+      return false;
+    }
+
+    const validationError = validateText(value);
+    if (validationError) {
+      setErrorMessage(validationError);
+      return false;
+    }
+
+    if (!bucketId) {
+      setErrorMessage("bucket_idが未設定です。");
+      return false;
+    }
+
+    if (!writeKeyHash) {
+      setErrorMessage("write_keyが未設定のため保存できません。");
+      return false;
+    }
+
+    setStatus("saving");
+    resetMessages();
+
+    const expiresAt = new Date(
+      Date.now() + expirationDays * 24 * 60 * 60 * 1000
+    ).toISOString();
+
+    const { error } = await supabaseClient.from("phrases").insert({
+      bucket_id: bucketId,
+      text: value.trim(),
+      write_key_hash: writeKeyHash,
+      expires_at: expiresAt,
+    });
+
+    if (error) {
+      console.error("Failed to save phrase:", error);
+      setErrorMessage("保存に失敗しました。");
+      setStatus("idle");
+      return false;
+    }
+
+    const cleanupOk = await cleanupOverflow(bucketId);
+    const fetchOk = await fetchPhrases(bucketId);
+
+    setStatus("idle");
+    if (cleanupOk && fetchOk) {
+      setInfoMessage("保存しました。");
+      return true;
+    }
+
+    return false;
+  };
+
+  const handleSave = async (): Promise<void> => {
+    const success = await savePhrase(text);
+    if (success) {
+      setText("");
     }
   };
+
+  const handleCopyText = async (value: string): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setInfoMessage("コピーしました。");
+    } catch (error) {
+      console.error("Failed to copy:", error);
+      setErrorMessage("コピーに失敗しました。");
+    }
+  };
+
+  const requestPolish = async (value: string): Promise<string | null> => {
+    const validationError = validateText(value);
+    if (validationError) {
+      setErrorMessage(validationError);
+      return null;
+    }
+
+    setStatus("polishing");
+    resetMessages();
+
+    try {
+      const response = await fetch("/api/polish", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: value.trim(),
+          mode: "request_line",
+          extraInstruction: "",
+        }),
+      });
+
+      const data = (await response.json()) as PolishResponse;
+
+      if (!response.ok) {
+        const message = data.error ?? "AIの推敲に失敗しました。";
+        setErrorMessage(message);
+        setStatus("idle");
+        return null;
+      }
+
+      setStatus("idle");
+      return data.output ?? "";
+    } catch (error) {
+      console.error("Failed to polish:", error);
+      setErrorMessage("AIの推敲に失敗しました。");
+      setStatus("idle");
+      return null;
+    }
+  };
+
+  const handlePolishAndCopy = async (): Promise<void> => {
+    const result = await requestPolish(text);
+    if (!result) {
+      return;
+    }
+
+    setPolishedText(result);
+    await handleCopyText(result);
+  };
+
+  const handlePolishAndSave = async (): Promise<void> => {
+    const result = await requestPolish(text);
+    if (!result) {
+      return;
+    }
+
+    setPolishedText(result);
+    await savePhrase(result);
+  };
+
+  const handlePolishPhrase = async (phrase: Phrase): Promise<void> => {
+    const result = await requestPolish(phrase.text);
+    if (!result) {
+      return;
+    }
+
+    setPolishedText(result);
+  };
+
+  const handleDeletePhrase = async (phraseId: string): Promise<boolean> => {
+    if (!writeKeyHash) {
+      setErrorMessage("write_keyが未設定のため削除できません。");
+      return false;
+    }
+
+    setStatus("saving");
+    resetMessages();
+
+    try {
+      const response = await fetch("/api/phrases/delete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: phraseId,
+          bucketId,
+          writeKeyHash,
+        }),
+      });
+
+      const data = (await response.json()) as ApiResponse;
+      if (!response.ok || !data.success) {
+        setErrorMessage(
+          getApiErrorMessage(response.status, data.error ?? "削除に失敗しました。")
+        );
+        setStatus("idle");
+        return false;
+      }
+
+      const fetchOk = await fetchPhrases(bucketId);
+      setStatus("idle");
+      return fetchOk;
+    } catch (error) {
+      console.error("Failed to delete phrase:", error);
+      setErrorMessage("削除に失敗しました。");
+      setStatus("idle");
+      return false;
+    }
+  };
+
+  const handleApplyBucket = async (): Promise<void> => {
+    const trimmed = bucketInput.trim();
+    if (!isValidBucketId(trimmed)) {
+      setErrorMessage(`bucket_idは${minBucketLength}文字以上で入力してください。`);
+      return;
+    }
+
+    if (typeof window !== "undefined") {
+      localStorage.setItem(bucketStorageKey, trimmed);
+    }
+
+    setBucketId(trimmed);
+    setInfoMessage("bucket_idを切り替えました。");
+  };
+
+  const handleApplyWriteKey = async (): Promise<void> => {
+    const trimmed = writeKeyInput.trim();
+    if (trimmed.length === 0) {
+      setErrorMessage("write_keyを入力してください。");
+      return;
+    }
+
+    if (typeof window !== "undefined") {
+      localStorage.setItem(writeKeyStorageKey, trimmed);
+    }
+
+    setWriteKey(trimmed);
+    setInfoMessage("write_keyを切り替えました。");
+  };
+
+  if (!hasSupabaseConfig) {
+    return (
+      <div className="w-full max-w-2xl rounded-xl border border-red-200 bg-red-50 p-6 text-red-700">
+        <h2 className="text-lg font-bold">Supabase設定が必要です</h2>
+        <p className="mt-2 text-sm">
+          環境変数にNEXT_PUBLIC_SUPABASE_URLとNEXT_PUBLIC_SUPABASE_ANON_KEYを設定してください。
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div className="w-full max-w-2xl">
-      <div className="flex flex-col space-y-4">
-        {/* Input Text Area */}
-        <label htmlFor="memo-input" className="font-bold">あなたのメモ:</label>
-        <textarea
-          id="memo-input"
-          rows={10}
-          className="p-2 border rounded"
-          placeholder="ここに雑なメモを入力してください..."
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          disabled={status === 'loading'}
-        />
+    <div className="w-full max-w-3xl space-y-6">
+      <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-2">
+          <label htmlFor="phrase-input" className="text-sm font-bold text-slate-700">
+            フレーズ入力
+          </label>
+          <textarea
+            id="phrase-input"
+            rows={6}
+            className="w-full rounded-lg border border-slate-200 p-3 text-sm focus:border-slate-400 focus:outline-none"
+            placeholder="例：明日の打ち合わせ、15時からに変更できますか？"
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+            disabled={isBusy}
+          />
+          <div className="flex items-center justify-between text-xs text-slate-500">
+            <span>残り{remainingChars}文字</span>
+            <span>最大{maxTextLength}文字</span>
+          </div>
+        </div>
 
-        {/* Mode Selection */}
-        <label htmlFor="mode-select" className="font-bold">モード:</label>
-        <select 
-          id="mode-select" 
-          className="p-2 border rounded"
-          value={mode}
-          onChange={(e) => setMode(e.target.value as Mode)}
-          disabled={status === 'loading'}
-        >
-          {modes.map(m => (
-            <option key={m} value={m}>{m}</option>
-          ))}
-        </select>
-
-        {/* Extra Instruction */}
-        <label htmlFor="extra-instruction" className="font-bold">追加の指示（任意）:</label>
-        <input
-          id="extra-instruction"
-          type="text"
-          className="p-2 border rounded"
-          placeholder="例：丁寧な言葉遣いで"
-          value={extraInstruction}
-          onChange={(e) => setExtraInstruction(e.target.value)}
-          disabled={status === 'loading'}
-        />
-
-        {/* Action Buttons */}
-        <div className="flex space-x-4">
-          <button 
-            onClick={handlePolish}
-            className="flex-1 bg-blue-500 text-white font-bold py-2 px-4 rounded hover:bg-blue-700 disabled:bg-blue-300"
-            disabled={status === 'loading'}
+        <div className="grid gap-3 md:grid-cols-3">
+          <button
+            type="button"
+            onClick={handleSave}
+            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800 disabled:bg-slate-300"
+            disabled={isBusy || isReadOnly}
           >
-            {status === 'loading' ? '清書中...' : '清書'}
+            保存
+          </button>
+          <button
+            type="button"
+            onClick={handlePolishAndCopy}
+            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:border-slate-400 disabled:text-slate-300"
+            disabled={isBusy}
+          >
+            推敲してコピー
+          </button>
+          <button
+            type="button"
+            onClick={handlePolishAndSave}
+            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:border-slate-400 disabled:text-slate-300"
+            disabled={isBusy || isReadOnly}
+          >
+            推敲して保存
           </button>
         </div>
 
-        {/* Status Display */}
-        <div className="text-center p-2">
-          ステータス: {status}
-        </div>
+        {isReadOnly && (
+          <p className="text-xs text-amber-600">
+            write_keyが未設定のため読み取り専用です（保存・削除はできません）。
+          </p>
+        )}
 
-        {/* Output Text Area */}
-        <label htmlFor="output-area" className="font-bold">清書後のメモ:</label>
+        {(errorMessage || infoMessage) && (
+          <div
+            className={`rounded-lg px-3 py-2 text-sm ${
+              errorMessage
+                ? "border border-red-200 bg-red-50 text-red-700"
+                : "border border-emerald-200 bg-emerald-50 text-emerald-700"
+            }`}
+          >
+            {errorMessage || infoMessage}
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="text-sm font-bold text-slate-700">bucket_id</h2>
+        <div className="flex flex-col gap-2 md:flex-row md:items-center">
+          <input
+            type="text"
+            value={bucketId}
+            readOnly
+            className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+          />
+          <button
+            type="button"
+            onClick={() => handleCopyText(bucketId)}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:border-slate-400 disabled:text-slate-300"
+            disabled={!bucketId || isBusy}
+          >
+            コピー
+          </button>
+        </div>
+        <div className="flex flex-col gap-2 md:flex-row md:items-center">
+          <input
+            type="text"
+            value={bucketInput}
+            onChange={(event) => setBucketInput(event.target.value)}
+            placeholder="別端末のbucket_idを入力"
+            className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            disabled={isBusy}
+          />
+          <button
+            type="button"
+            onClick={handleApplyBucket}
+            className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200 disabled:text-slate-300"
+            disabled={isBusy}
+          >
+            適用
+          </button>
+        </div>
+        <p className="text-xs text-slate-500">
+          bucket_idは同期キーです。共有は自己責任で行ってください。
+        </p>
+      </section>
+
+      <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold text-slate-700">Advanced</h2>
+          <button
+            type="button"
+            onClick={() => setShowAdvanced((current) => !current)}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-700 hover:border-slate-400"
+          >
+            {showAdvanced ? "閉じる" : "表示"}
+          </button>
+        </div>
+        {showAdvanced && (
+          <div className="space-y-3">
+            <div className="flex flex-col gap-2 md:flex-row md:items-center">
+              <input
+                type="text"
+                value={writeKey}
+                readOnly
+                className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => handleCopyText(writeKey)}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:border-slate-400 disabled:text-slate-300"
+                disabled={!writeKey || isBusy}
+              >
+                コピー
+              </button>
+            </div>
+            <div className="flex flex-col gap-2 md:flex-row md:items-center">
+              <input
+                type="text"
+                value={writeKeyInput}
+                onChange={(event) => setWriteKeyInput(event.target.value)}
+                placeholder="共有するwrite_keyを入力"
+                className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                disabled={isBusy}
+              />
+              <button
+                type="button"
+                onClick={handleApplyWriteKey}
+                className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200 disabled:text-slate-300"
+                disabled={isBusy}
+              >
+                適用
+              </button>
+            </div>
+            <p className="text-xs text-slate-500">
+              同じbucket_idで同期する場合は同じwrite_keyを設定してください。
+            </p>
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold text-slate-700">推敲結果</h2>
+          <button
+            type="button"
+            onClick={() => handleCopyText(polishedText)}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:border-slate-400 disabled:text-slate-300"
+            disabled={!polishedText}
+          >
+            コピー
+          </button>
+        </div>
         <textarea
-          id="output-area"
-          rows={10}
+          rows={4}
           readOnly
-          className={`p-2 border rounded ${status === 'error' ? 'border-red-500 bg-red-50' : 'bg-gray-100'}`}
-          placeholder="ここに清書結果が表示されます..."
-          value={output}
+          className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm"
+          value={polishedText}
+          placeholder="推敲結果がここに表示されます"
         />
-        
-        {/* Copy Button */}
-        <button 
-          onClick={handleCopy}
-          className="bg-green-500 text-white font-bold py-2 px-4 rounded hover:bg-green-700 disabled:bg-gray-400"
-          disabled={!output || status === 'loading'}
-        >
-            {copyButtonText}
-        </button>
-      </div>
+      </section>
+
+      <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold text-slate-700">フレーズ一覧</h2>
+          <button
+            type="button"
+            onClick={() => void fetchPhrases(bucketId)}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:border-slate-400 disabled:text-slate-300"
+            disabled={!bucketId || isBusy}
+          >
+            更新
+          </button>
+        </div>
+        {phrases.length === 0 ? (
+          <p className="text-sm text-slate-500">まだフレーズがありません。</p>
+        ) : (
+          <ul className="space-y-3">
+            {phrases.map((phrase) => (
+              <li
+                key={phrase.id}
+                className="rounded-xl border border-slate-200 p-4 shadow-sm"
+              >
+                <div className="space-y-2">
+                  <p className="whitespace-pre-wrap text-sm text-slate-800">
+                    {phrase.text}
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    作成: {formatDateTime(phrase.created_at)}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleCopyText(phrase.text)}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-700 hover:border-slate-400"
+                    >
+                      コピー
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handlePolishPhrase(phrase)}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-700 hover:border-slate-400"
+                    >
+                      推敲
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleDeletePhrase(phrase.id)}
+                      className="rounded-lg border border-red-200 bg-white px-3 py-1 text-xs font-bold text-red-600 hover:border-red-400"
+                      disabled={isReadOnly}
+                    >
+                      削除
+                    </button>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
-}
+};
+
+export default PolishForm;
