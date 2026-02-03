@@ -95,6 +95,7 @@ const PolishForm: React.FC<Props> = () => {
   const [status, setStatus] = useState<StatusKind>("idle");
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [infoMessage, setInfoMessage] = useState<string>("");
+  const [showBucket, setShowBucket] = useState<boolean>(false);
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
 
   const isBusy = status !== "idle";
@@ -493,7 +494,7 @@ const PolishForm: React.FC<Props> = () => {
           <textarea
             id="phrase-input"
             rows={6}
-            className="w-full rounded-lg border border-slate-200 p-3 text-sm focus:border-slate-400 focus:outline-none"
+            className="w-full rounded-lg border border-slate-200 p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none"
             placeholder="例：明日の打ち合わせ、15時からに変更できますか？"
             value={text}
             onChange={(event) => setText(event.target.value)}
@@ -552,44 +553,57 @@ const PolishForm: React.FC<Props> = () => {
       </section>
 
       <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-sm font-bold text-slate-700">bucket_id</h2>
-        <div className="flex flex-col gap-2 md:flex-row md:items-center">
-          <input
-            type="text"
-            value={bucketId}
-            readOnly
-            className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
-          />
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold text-slate-700">bucket_id</h2>
           <button
             type="button"
-            onClick={() => handleCopyText(bucketId)}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:border-slate-400 disabled:text-slate-300"
-            disabled={!bucketId || isBusy}
+            onClick={() => setShowBucket((current) => !current)}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-700 hover:border-slate-400"
           >
-            コピー
+            {showBucket ? "閉じる" : "表示"}
           </button>
         </div>
-        <div className="flex flex-col gap-2 md:flex-row md:items-center">
-          <input
-            type="text"
-            value={bucketInput}
-            onChange={(event) => setBucketInput(event.target.value)}
-            placeholder="別端末のbucket_idを入力"
-            className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm"
-            disabled={isBusy}
-          />
-          <button
-            type="button"
-            onClick={handleApplyBucket}
-            className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200 disabled:text-slate-300"
-            disabled={isBusy}
-          >
-            適用
-          </button>
-        </div>
-        <p className="text-xs text-slate-500">
-          bucket_idは同期キーです。共有は自己責任で行ってください。
-        </p>
+        {showBucket && (
+          <div className="space-y-2">
+            <div className="flex flex-col gap-2 md:flex-row md:items-center">
+              <input
+                type="text"
+                value={bucketId}
+                readOnly
+                className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => handleCopyText(bucketId)}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:border-slate-400 disabled:text-slate-300"
+                disabled={!bucketId || isBusy}
+              >
+                コピー
+              </button>
+            </div>
+            <div className="flex flex-col gap-2 md:flex-row md:items-center">
+              <input
+                type="text"
+                value={bucketInput}
+                onChange={(event) => setBucketInput(event.target.value)}
+                placeholder="別端末のbucket_idを入力"
+                className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                disabled={isBusy}
+              />
+              <button
+                type="button"
+                onClick={handleApplyBucket}
+                className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200 disabled:text-slate-300"
+                disabled={isBusy}
+              >
+                適用
+              </button>
+            </div>
+            <p className="text-xs text-slate-500">
+              bucket_idは同期キーです。共有は自己責任で行ってください。
+            </p>
+          </div>
+        )}
       </section>
 
       <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -661,7 +675,7 @@ const PolishForm: React.FC<Props> = () => {
         <textarea
           rows={4}
           readOnly
-          className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm"
+          className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-900 placeholder:text-slate-400"
           value={polishedText}
           placeholder="推敲結果がここに表示されます"
         />
