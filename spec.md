@@ -40,43 +40,51 @@ AI 推敲は任意機能で、通常の保存はAIなしで完結します。
 - Advanced: write_key 表示・コピー / 手動入力
 - 下部: フレーズ一覧（コピー / 推敲 / 削除）
 
-## 6. 主要フロー
+## 6. UI体験（操作フィードバック）
 
-### 6.1. 保存
+- 操作中は対象ボタンを `disabled` にし、スピナーと `opacity` で状態を示す
+- トースト通知（成功/失敗）を右下に表示し 2〜3秒で消える
+- 入力欄に「未保存 / 保存済み」を表示する
+- 削除時は対象行をフェードアウトし、成功後にリストから除去する
+- エラーはフォーム上部表示を主とし、トーストは補助とする
+
+## 7. 主要フロー
+
+### 7.1. 保存
 
 - 入力バリデーション（2000文字以内）
 - `bucket_id` と `write_key_hash` を付与して保存
 - 期限は `created_at + 7日`
 - 保存後に cleanup を実行
 
-### 6.2. 取得
+### 7.2. 取得
 
 - `bucket_id` で最新順に取得
 - `expires_at` が過去の行は非表示
 
-### 6.3. 削除
+### 7.3. 削除
 
 - サーバAPIで `id + bucket_id + write_key_hash` を検証
 - 一致しない場合は 403 / 不存在は 404
 
-### 6.4. cleanup
+### 7.4. cleanup
 
 1) expires_at が過去の行を削除  
 2) created_at DESC で最新200件を残し、超過分を削除
 
-## 7. API
+## 8. API
 
 - `POST /api/polish`（Gemini API）
 - `POST /api/phrases/delete`（削除）
 - `POST /api/phrases/cleanup`（200件整理）
 
-## 8. 制約
+## 9. 制約
 
 - 認証なし（MVP）
 - 複雑な状態管理は使わない
 - モバイル対応
 
-## 9. Definition of Done
+## 10. Definition of Done
 
 - 同じ bucket_id で 2端末の同期が取れる
 - 保存/削除が write_key で保護される

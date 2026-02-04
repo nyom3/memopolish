@@ -1,5 +1,14 @@
 ﻿# CHANGELOG
 
+## 2026-02-04
+
+### Added
+- 操作フィードバック（スピナー/トースト/未保存表示）
+- 削除時のフェードアウト
+
+### Changed
+- 操作別に busy を分離し、不要なブロックを回避
+
 ## 2026-02-03
 
 コミットメッセージ: Implement server-side phrase maintenance and refresh docs
@@ -17,3 +26,5 @@
 ### Fixed
 - write_key 不一致による削除失敗の可視化
 - cleanup の古いデータ整理ロジック
+
+
