@@ -1,5 +1,19 @@
 ﻿# CHANGELOG
 
+## 2026-02-05
+
+### Added
+- AI加工モード（polish / keigo / keypoints）
+- PWA対応（manifest / icons / service worker）
+- 仕組み解説ドキュメントの追加
+
+### Changed
+- UI表記を共有ルームID / 編集キーへ変更
+- AI加工の出力が途中で切れた場合の再試行ロジックを追加
+
+### Fixed
+- UTF-8文字化けの修正
+
 ## 2026-02-04
 
 ### Added
@@ -26,5 +40,6 @@
 ### Fixed
 - write_key 不一致による削除失敗の可視化
 - cleanup の古いデータ整理ロジック
+
 
 

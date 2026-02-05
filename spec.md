@@ -3,7 +3,7 @@
 ## 1. 概要
 
 MemoPolish は、PC とスマホの間でフレーズを共有する PhraseBridge です。  
-AI 推敲は任意機能で、通常の保存はAIなしで完結します。
+AI 加工（推敲 / 敬語化 / 要点抽出）は任意機能で、通常の保存はAIなしで完結します。
 
 ## 2. 目的（MVP）
 
@@ -25,8 +25,8 @@ AI 推敲は任意機能で、通常の保存はAIなしで完結します。
 
 ## 4. キーと同期の考え方
 
-- bucket_id: 閲覧キー（22文字以上）
-- write_key: 保存・削除キー
+- 共有ルームID（内部名: bucket_id）: 閲覧キー（22文字以上）
+- 編集キー（内部名: write_key）: 保存・削除キー
 - 同じ bucket_id で同期する場合は **同じ write_key** を使う
 - write_key_hash は SHA-256 で生成し、平文はDBに保存しない
 
@@ -35,10 +35,11 @@ AI 推敲は任意機能で、通常の保存はAIなしで完結します。
 1画面構成:
 
 - 上部: フレーズ入力
-- ボタン: 保存 / 推敲してコピー / 推敲して保存
-- 中央: bucket_id 表示 + コピー / 手動入力
-- Advanced: write_key 表示・コピー / 手動入力
-- 下部: フレーズ一覧（コピー / 推敲 / 削除）
+- ボタン: 保存 / AI加工してコピー / AI加工して保存
+- AI加工モード: polish / keigo / keypoints のドロップダウン
+- 中央: 共有ルームID 表示 + コピー / 手動入力
+- 編集キー（詳細）: 編集キー 表示・コピー / 手動入力
+- 下部: フレーズ一覧（コピー / AI加工 / 削除）
 
 ## 6. UI体験（操作フィードバック）
 
@@ -75,19 +76,27 @@ AI 推敲は任意機能で、通常の保存はAIなしで完結します。
 ## 8. API
 
 - `POST /api/polish`（Gemini API）
+  - request: `{ text, mode, extraInstruction? }`
+  - mode: `polish | keigo | keypoints`
 - `POST /api/phrases/delete`（削除）
 - `POST /api/phrases/cleanup`（200件整理）
 
-## 9. 制約
+## 9. PWA
+
+- `public/manifest.webmanifest` と `public/sw.js` を使用
+- アプリシェルと静的アセットのみキャッシュ
+- API レスポンスはキャッシュしない
+
+## 10. 制約
 
 - 認証なし（MVP）
 - 複雑な状態管理は使わない
 - モバイル対応
 
-## 10. Definition of Done
+## 11. Definition of Done
 
 - 同じ bucket_id で 2端末の同期が取れる
 - 保存/削除が write_key で保護される
 - 期限切れが表示されない
 - 200件上限が維持される
-- AI 推敲が任意で利用できる
+- AI 加工が任意で利用できる

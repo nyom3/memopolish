@@ -14,6 +14,7 @@
 - **DB / Storage**: `@supabase/supabase-js`（Supabase）
 - **Styling**: Tailwind CSS (v4)
 - **Lint**: ESLint + eslint-config-next
+- **PWA**: Service Worker + Web App Manifest
 
 ## サーバ構成
 

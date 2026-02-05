@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
+// サーバ側のみで使うSupabase管理クライアント
 const supabaseUrl: string = process.env.SUPABASE_URL ?? "";
 const serviceRoleKey: string = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
 

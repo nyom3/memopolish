@@ -8,6 +8,7 @@ type CleanupPayload = {
   maxPhraseCount?: number;
 };
 
+// 受け取れなかった場合の上限
 const fallbackMaxPhraseCount = 200;
 
 const isValidBucketId = (value: string): boolean => value.length >= 22;

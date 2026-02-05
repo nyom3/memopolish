@@ -16,6 +16,8 @@ type PolishResponse = {
   error?: string;
 };
 
+type PolishMode = "polish" | "keigo" | "keypoints";
+
 type ApiResponse = {
   success?: boolean;
   error?: string;
@@ -31,6 +33,7 @@ type ToastItem = {
   variant: ToastVariant;
 };
 
+// localStorage に保存するキー名
 const bucketStorageKey = "phrasebridge_bucket_id";
 const writeKeyStorageKey = "phrasebridge_write_key";
 const minBucketLength = 22;
@@ -40,6 +43,7 @@ const maxPhraseCount = 200;
 const expirationDays = 7;
 const toastDurationMs = 2400;
 
+// 共有ID/編集キー用の簡易URLセーフ変換
 const toBase64Url = (bytes: Uint8Array): string => {
   let binary = "";
   bytes.forEach((byte) => {
@@ -49,6 +53,7 @@ const toBase64Url = (bytes: Uint8Array): string => {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 };
 
+// 推測されにくいランダムIDを生成
 const generateRandomId = (minLength: number): string => {
   let value = "";
 
@@ -61,6 +66,7 @@ const generateRandomId = (minLength: number): string => {
   return value.slice(0, minLength);
 };
 
+// write_key をサーバへ送る前にハッシュ化
 const hashSha256 = async (value: string): Promise<string> => {
   const encoder = new TextEncoder();
   const data = encoder.encode(value);
@@ -101,6 +107,7 @@ const PolishForm: React.FC<Props> = () => {
   const [phrases, setPhrases] = useState<Phrase[]>([]);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
   const [polishedText, setPolishedText] = useState<string>("");
+  const [aiMode, setAiMode] = useState<PolishMode>("polish");
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isPolishing, setIsPolishing] = useState<boolean>(false);
   const [isFetching, setIsFetching] = useState<boolean>(false);
@@ -124,6 +131,7 @@ const PolishForm: React.FC<Props> = () => {
     return trimmed !== lastSavedText.trim();
   }, [lastSavedText, text]);
 
+  // 初回のみ共有ルームID / 編集キーを生成して保存
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
@@ -155,6 +163,7 @@ const PolishForm: React.FC<Props> = () => {
     setWriteKeyInput(nextWriteKey);
   }, []);
 
+  // 編集キーが変わったらハッシュを更新
   useEffect(() => {
     if (!writeKey) {
       setWriteKeyHash("");
@@ -167,7 +176,7 @@ const PolishForm: React.FC<Props> = () => {
         setWriteKeyHash(hashed);
       } catch (error) {
         console.error("Failed to hash write_key", error);
-        setErrorMessage("write_keyの生成に失敗しました。");
+        setErrorMessage("編集キーの生成に失敗しました。");
       }
     })();
   }, [writeKey]);
@@ -206,7 +215,7 @@ const PolishForm: React.FC<Props> = () => {
 
   const getApiErrorMessage = (status: number, fallback: string): string => {
     if (status === 403) {
-      return "write_keyが一致しないため操作できません。";
+      return "編集キーが一致しないため操作できません。";
     }
     if (status === 404) {
       return "対象のフレーズが見つかりません。";
@@ -217,6 +226,7 @@ const PolishForm: React.FC<Props> = () => {
     return fallback;
   };
 
+  // 共有ルームIDごとに最新順で取得
   const fetchPhrases = async (activeBucketId: string): Promise<boolean> => {
     if (!supabaseClient || !hasSupabaseConfig) {
       setErrorMessage("Supabaseの設定が見つかりません。");
@@ -247,10 +257,11 @@ const PolishForm: React.FC<Props> = () => {
     return true;
   };
 
+  // サーバ側で期限切れ/件数超過の整理を実施
   const cleanupOverflow = async (activeBucketId: string): Promise<boolean> => {
     if (!writeKeyHash) {
-      setErrorMessage("write_keyが未設定のため整理できません。");
-      pushToast("write_keyが未設定のため整理できません。", "error");
+      setErrorMessage("編集キーが未設定のため整理できません。");
+      pushToast("編集キーが未設定のため整理できません。", "error");
       return false;
     }
 
@@ -301,6 +312,7 @@ const PolishForm: React.FC<Props> = () => {
     return null;
   };
 
+  // 保存 → cleanup → 再取得の順でUIを更新
   const savePhrase = async (
     value: string,
     options: { updateSavedText: boolean }
@@ -319,14 +331,14 @@ const PolishForm: React.FC<Props> = () => {
     }
 
     if (!bucketId) {
-      setErrorMessage("bucket_idが未設定です。");
-      pushToast("bucket_idが未設定です。", "error");
+      setErrorMessage("共有ルームIDが未設定です。");
+      pushToast("共有ルームIDが未設定です。", "error");
       return false;
     }
 
     if (!writeKeyHash) {
-      setErrorMessage("write_keyが未設定のため保存できません。");
-      pushToast("write_keyが未設定のため保存できません。", "error");
+      setErrorMessage("編集キーが未設定のため保存できません。");
+      pushToast("編集キーが未設定のため保存できません。", "error");
       return false;
     }
 
@@ -388,6 +400,7 @@ const PolishForm: React.FC<Props> = () => {
     }
   };
 
+  // AI加工（polish / keigo / keypoints）
   const requestPolish = async (value: string): Promise<string | null> => {
     const validationError = validateText(value);
     if (validationError) {
@@ -407,7 +420,7 @@ const PolishForm: React.FC<Props> = () => {
         },
         body: JSON.stringify({
           text: value.trim(),
-          mode: "request_line",
+          mode: aiMode,
           extraInstruction: "",
         }),
       });
@@ -415,7 +428,7 @@ const PolishForm: React.FC<Props> = () => {
       const data = (await response.json()) as PolishResponse;
 
       if (!response.ok) {
-        const message = data.error ?? "AIの推敲に失敗しました。";
+        const message = data.error ?? "AI加工に失敗しました。";
         setErrorMessage(message);
         pushToast(message, "error");
         setIsPolishing(false);
@@ -426,8 +439,8 @@ const PolishForm: React.FC<Props> = () => {
       return data.output ?? "";
     } catch (error) {
       console.error("Failed to polish:", error);
-      setErrorMessage("AIの推敲に失敗しました。");
-      pushToast("AIの推敲に失敗しました。", "error");
+      setErrorMessage("AI加工に失敗しました。");
+      pushToast("AI加工に失敗しました。", "error");
       setIsPolishing(false);
       return null;
     }
@@ -450,9 +463,9 @@ const PolishForm: React.FC<Props> = () => {
     }
 
     setPolishedText(result);
-    await savePhrase(result, { updateSavedText: false });
-    if (!errorMessage) {
-      pushToast("推敲して保存しました。", "success");
+    const saved = await savePhrase(result, { updateSavedText: false });
+    if (saved) {
+      pushToast("AI加工して保存しました。", "success");
     }
   };
 
@@ -465,10 +478,11 @@ const PolishForm: React.FC<Props> = () => {
     setPolishedText(result);
   };
 
+  // サーバAPIで削除権限を検証して削除
   const handleDeletePhrase = async (phraseId: string): Promise<boolean> => {
     if (!writeKeyHash) {
-      setErrorMessage("write_keyが未設定のため削除できません。");
-      pushToast("write_keyが未設定のため削除できません。", "error");
+      setErrorMessage("編集キーが未設定のため削除できません。");
+      pushToast("編集キーが未設定のため削除できません。", "error");
       return false;
     }
 
@@ -536,8 +550,8 @@ const PolishForm: React.FC<Props> = () => {
   const handleApplyBucket = async (): Promise<void> => {
     const trimmed = bucketInput.trim();
     if (!isValidBucketId(trimmed)) {
-      setErrorMessage(`bucket_idは${minBucketLength}文字以上で入力してください。`);
-      pushToast(`bucket_idは${minBucketLength}文字以上で入力してください。`, "error");
+      setErrorMessage(`共有ルームIDは${minBucketLength}文字以上で入力してください。`);
+      pushToast(`共有ルームIDは${minBucketLength}文字以上で入力してください。`, "error");
       return;
     }
 
@@ -546,15 +560,15 @@ const PolishForm: React.FC<Props> = () => {
     }
 
     setBucketId(trimmed);
-    setInfoMessage("bucket_idを切り替えました。");
-    pushToast("bucket_idを切り替えました。", "success");
+    setInfoMessage("共有ルームIDを切り替えました。");
+    pushToast("共有ルームIDを切り替えました。", "success");
   };
 
   const handleApplyWriteKey = async (): Promise<void> => {
     const trimmed = writeKeyInput.trim();
     if (trimmed.length === 0) {
-      setErrorMessage("write_keyを入力してください。");
-      pushToast("write_keyを入力してください。", "error");
+      setErrorMessage("編集キーを入力してください。");
+      pushToast("編集キーを入力してください。", "error");
       return;
     }
 
@@ -563,8 +577,8 @@ const PolishForm: React.FC<Props> = () => {
     }
 
     setWriteKey(trimmed);
-    setInfoMessage("write_keyを切り替えました。");
-    pushToast("write_keyを切り替えました。", "success");
+    setInfoMessage("編集キーを切り替えました。");
+    pushToast("編集キーを切り替えました。", "success");
   };
 
   if (!hasSupabaseConfig) {
@@ -632,10 +646,10 @@ const PolishForm: React.FC<Props> = () => {
             {isPolishing ? (
               <>
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-400 border-t-slate-700" />
-                推敲中
+                加工中
               </>
             ) : (
-              "推敲してコピー"
+              "AI加工してコピー"
             )}
           </button>
           <button
@@ -647,17 +661,35 @@ const PolishForm: React.FC<Props> = () => {
             {isPolishing ? (
               <>
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-400 border-t-slate-700" />
-                推敲中
+                加工中
               </>
             ) : (
-              "推敲して保存"
+              "AI加工して保存"
             )}
           </button>
         </div>
 
+        <div className="flex flex-col gap-2 text-xs text-slate-600 md:flex-row md:items-center">
+          <label htmlFor="ai-mode" className="font-bold text-slate-700">
+            AI加工モード
+          </label>
+          <select
+            id="ai-mode"
+            value={aiMode}
+            onChange={(event) => setAiMode(event.target.value as PolishMode)}
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 md:w-60"
+            disabled={isPolishing}
+          >
+            <option value="polish">推敲（読みやすく整える）</option>
+            <option value="keigo">敬語化（丁寧で簡潔）</option>
+            <option value="keypoints">要点抽出（箇条書き最大5点）</option>
+          </select>
+          <span>入力にない事実は追加しません。</span>
+        </div>
+
         {isReadOnly && (
           <p className="text-xs text-amber-600">
-            write_keyが未設定のため読み取り専用です（保存・削除はできません）。
+            編集キーが未設定のため読み取り専用です（保存・削除はできません）。
           </p>
         )}
 
@@ -676,7 +708,7 @@ const PolishForm: React.FC<Props> = () => {
 
       <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold text-slate-700">bucket_id</h2>
+          <h2 className="text-sm font-bold text-slate-700">共有ルームID</h2>
           <button
             type="button"
             onClick={() => setShowBucket((current) => !current)}
@@ -708,7 +740,7 @@ const PolishForm: React.FC<Props> = () => {
                 type="text"
                 value={bucketInput}
                 onChange={(event) => setBucketInput(event.target.value)}
-                placeholder="別端末のbucket_idを入力"
+                placeholder="別端末の共有ルームIDを入力"
                 className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm"
                 disabled={isFormBusy}
               />
@@ -722,7 +754,7 @@ const PolishForm: React.FC<Props> = () => {
               </button>
             </div>
             <p className="text-xs text-slate-500">
-              bucket_idは同期キーです。共有は自己責任で行ってください。
+              共有ルームID：同じIDの端末同士で一覧が共有されます
             </p>
           </div>
         )}
@@ -730,7 +762,7 @@ const PolishForm: React.FC<Props> = () => {
 
       <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold text-slate-700">Advanced</h2>
+          <h2 className="text-sm font-bold text-slate-700">編集キー（詳細）</h2>
           <button
             type="button"
             onClick={() => setShowAdvanced((current) => !current)}
@@ -762,7 +794,7 @@ const PolishForm: React.FC<Props> = () => {
                 type="text"
                 value={writeKeyInput}
                 onChange={(event) => setWriteKeyInput(event.target.value)}
-                placeholder="共有するwrite_keyを入力"
+                placeholder="共有する編集キーを入力"
                 className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm"
                 disabled={isFormBusy}
               />
@@ -776,7 +808,7 @@ const PolishForm: React.FC<Props> = () => {
               </button>
             </div>
             <p className="text-xs text-slate-500">
-              同じbucket_idで同期する場合は同じwrite_keyを設定してください。
+              編集キー：保存・削除するためのキーです（共有すると編集できます）
             </p>
           </div>
         )}
@@ -784,7 +816,7 @@ const PolishForm: React.FC<Props> = () => {
 
       <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold text-slate-700">推敲結果</h2>
+          <h2 className="text-sm font-bold text-slate-700">AI加工結果</h2>
           <button
             type="button"
             onClick={() => handleCopyText(polishedText)}
@@ -799,7 +831,7 @@ const PolishForm: React.FC<Props> = () => {
           readOnly
           className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-900 placeholder:text-slate-400"
           value={polishedText}
-          placeholder="推敲結果がここに表示されます"
+          placeholder="AI加工結果がここに表示されます"
         />
       </section>
 
@@ -855,7 +887,7 @@ const PolishForm: React.FC<Props> = () => {
                       onClick={() => handlePolishPhrase(phrase)}
                       className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-700 hover:border-slate-400"
                     >
-                      推敲
+                      AI加工
                     </button>
                     <button
                       type="button"
