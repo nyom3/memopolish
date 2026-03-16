@@ -77,6 +77,7 @@ AI 加工（推敲 / 敬語化 / 要点抽出）は任意機能で、通常の�
 
 - `POST /api/polish`（Gemini API）
   - request: `{ text, mode, extraInstruction? }`
+  - `text` は 2000 文字以内、`extraInstruction` は 500 文字以内
   - mode: `polish | keigo | keypoints`
 - `POST /api/phrases/delete`（削除）
 - `POST /api/phrases/cleanup`（200件整理）

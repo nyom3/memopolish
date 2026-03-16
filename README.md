@@ -50,6 +50,7 @@ npm run dev
 - write_key_hash（SHA-256）で削除・整理を保護
 - 期限切れ（created_at + 7日）は非表示、cleanupで削除
 - 200件を超える場合は古いものを削除して上限維持
+- AI 加工 API は `text` 2000文字以内、`extraInstruction` 500文字以内
 
 ## 開発スクリプト
 

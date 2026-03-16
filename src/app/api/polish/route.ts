@@ -1,7 +1,9 @@
 ﻿import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+const maxInputLength = 2000;
+const maxExtraInstructionLength = 500;
+const geminiApiKey = process.env.GEMINI_API_KEY ?? "";
 
 type PolishMode = "polish" | "keigo" | "keypoints";
 
@@ -12,6 +14,13 @@ type PolishRequestBody = {
 };
 
 export async function POST(request: Request) {
+  if (!geminiApiKey) {
+    return NextResponse.json(
+      { error: "Gemini APIキーが未設定です。.env.local を確認してください。" },
+      { status: 500 }
+    );
+  }
+
   try {
     const { text, mode, extraInstruction } =
       (await request.json()) as PolishRequestBody;
@@ -21,10 +30,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "テキストを入力してください。" }, { status: 400 });
     }
 
-    const MAX_INPUT_LENGTH = 5000;
-    if (text.length > MAX_INPUT_LENGTH) {
+    if (text.length > maxInputLength) {
       return NextResponse.json(
-        { error: `テキストは${MAX_INPUT_LENGTH}文字以内で入力してください。` },
+        { error: `テキストは${maxInputLength}文字以内で入力してください。` },
         { status: 400 }
       );
     }
@@ -37,7 +45,27 @@ export async function POST(request: Request) {
       );
     }
 
+    if (extraInstruction !== undefined && typeof extraInstruction !== "string") {
+      return NextResponse.json(
+        { error: "追加指示の形式が不正です。" },
+        { status: 400 }
+      );
+    }
+
+    if (
+      typeof extraInstruction === "string" &&
+      extraInstruction.length > maxExtraInstructionLength
+    ) {
+      return NextResponse.json(
+        {
+          error: `追加指示は${maxExtraInstructionLength}文字以内で入力してください。`,
+        },
+        { status: 400 }
+      );
+    }
+
     // Gemini モデル初期化
+    const genAI = new GoogleGenerativeAI(geminiApiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const selectedMode = mode as PolishMode;
 
@@ -154,7 +182,7 @@ ${text}`;
     }
 
     return NextResponse.json({ output });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("API error:", error);
 
     let errorMessage = "サーバーでエラーが発生しました。";
