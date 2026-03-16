@@ -157,16 +157,20 @@ const PolishForm: React.FC<Props> = () => {
       localStorage.setItem(writeKeyStorageKey, nextWriteKey);
     }
 
-    setBucketId(nextBucketId);
-    setBucketInput(nextBucketId);
-    setWriteKey(nextWriteKey);
-    setWriteKeyInput(nextWriteKey);
+    queueMicrotask(() => {
+      setBucketId(nextBucketId);
+      setBucketInput(nextBucketId);
+      setWriteKey(nextWriteKey);
+      setWriteKeyInput(nextWriteKey);
+    });
   }, []);
 
   // 編集キーが変わったらハッシュを更新
   useEffect(() => {
     if (!writeKey) {
-      setWriteKeyHash("");
+      queueMicrotask(() => {
+        setWriteKeyHash("");
+      });
       return;
     }
 
@@ -182,17 +186,11 @@ const PolishForm: React.FC<Props> = () => {
   }, [writeKey]);
 
   useEffect(() => {
-    if (!bucketId || !hasSupabaseConfig || !supabaseClient) {
-      return;
-    }
+    const activeTimeouts = toastTimeouts.current;
 
-    void fetchPhrases(bucketId);
-  }, [bucketId]);
-
-  useEffect(() => {
     return () => {
-      toastTimeouts.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
-      toastTimeouts.current.clear();
+      activeTimeouts.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      activeTimeouts.clear();
     };
   }, []);
 
@@ -227,7 +225,7 @@ const PolishForm: React.FC<Props> = () => {
   };
 
   // 共有ルームIDごとに最新順で取得
-  const fetchPhrases = async (activeBucketId: string): Promise<boolean> => {
+  async function fetchPhrases(activeBucketId: string): Promise<boolean> {
     if (!supabaseClient || !hasSupabaseConfig) {
       setErrorMessage("Supabaseの設定が見つかりません。");
       return false;
@@ -255,7 +253,17 @@ const PolishForm: React.FC<Props> = () => {
     setPhrases(filtered);
     setIsFetching(false);
     return true;
-  };
+  }
+
+  useEffect(() => {
+    if (!bucketId || !hasSupabaseConfig || !supabaseClient) {
+      return;
+    }
+
+    queueMicrotask(() => {
+      void fetchPhrases(bucketId);
+    });
+  }, [bucketId]);
 
   // サーバ側で期限切れ/件数超過の整理を実施
   const cleanupOverflow = async (activeBucketId: string): Promise<boolean> => {
@@ -593,8 +601,8 @@ const PolishForm: React.FC<Props> = () => {
   }
 
   return (
-    <div className="w-full max-w-3xl space-y-6">
-      <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="w-full max-w-4xl space-y-4 sm:space-y-5 md:space-y-6">
+      <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 md:p-6">
         <div className="flex flex-col gap-2">
           <label htmlFor="phrase-input" className="text-sm font-bold text-slate-700">
             フレーズ入力
@@ -602,7 +610,7 @@ const PolishForm: React.FC<Props> = () => {
           <textarea
             id="phrase-input"
             rows={6}
-            className="w-full rounded-lg border border-slate-200 p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none"
+            className="min-h-36 w-full rounded-lg border border-slate-200 p-3.5 text-[15px] text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none sm:text-sm"
             placeholder="例：明日の打ち合わせ、15時からに変更できますか？"
             value={text}
             onChange={(event) => setText(event.target.value)}
@@ -625,7 +633,7 @@ const PolishForm: React.FC<Props> = () => {
           <button
             type="button"
             onClick={handleSave}
-            className="flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-60"
+            className="flex min-h-12 items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-3 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-60"
             disabled={isSaving || isPolishing || isReadOnly}
           >
             {isSaving ? (
@@ -640,7 +648,7 @@ const PolishForm: React.FC<Props> = () => {
           <button
             type="button"
             onClick={handlePolishAndCopy}
-            className="flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:border-slate-400 disabled:opacity-60"
+            className="flex min-h-12 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:border-slate-400 disabled:opacity-60"
             disabled={isPolishing}
           >
             {isPolishing ? (
@@ -655,7 +663,7 @@ const PolishForm: React.FC<Props> = () => {
           <button
             type="button"
             onClick={handlePolishAndSave}
-            className="flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:border-slate-400 disabled:opacity-60"
+            className="flex min-h-12 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:border-slate-400 disabled:opacity-60"
             disabled={isPolishing || isReadOnly}
           >
             {isPolishing ? (
@@ -677,7 +685,7 @@ const PolishForm: React.FC<Props> = () => {
             id="ai-mode"
             value={aiMode}
             onChange={(event) => setAiMode(event.target.value as PolishMode)}
-            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 md:w-60"
+            className="min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 md:w-60"
             disabled={isPolishing}
           >
             <option value="polish">推敲（読みやすく整える）</option>
@@ -706,13 +714,13 @@ const PolishForm: React.FC<Props> = () => {
         )}
       </section>
 
-      <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 md:p-6">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold text-slate-700">共有ルームID</h2>
           <button
             type="button"
             onClick={() => setShowBucket((current) => !current)}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-700 hover:border-slate-400"
+            className="min-h-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:border-slate-400 sm:text-xs"
           >
             {showBucket ? "閉じる" : "表示"}
           </button>
@@ -724,12 +732,12 @@ const PolishForm: React.FC<Props> = () => {
                 type="text"
                 value={bucketId}
                 readOnly
-                className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+                className="min-h-11 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm"
               />
               <button
                 type="button"
                 onClick={() => handleCopyText(bucketId)}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:border-slate-400 disabled:opacity-60"
+            className="min-h-11 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:border-slate-400 disabled:opacity-60"
             disabled={!bucketId}
           >
             コピー
@@ -741,13 +749,13 @@ const PolishForm: React.FC<Props> = () => {
                 value={bucketInput}
                 onChange={(event) => setBucketInput(event.target.value)}
                 placeholder="別端末の共有ルームIDを入力"
-                className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                className="min-h-11 flex-1 rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
                 disabled={isFormBusy}
               />
               <button
                 type="button"
                 onClick={handleApplyBucket}
-                className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200 disabled:opacity-60"
+                className="min-h-11 rounded-lg bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-200 disabled:opacity-60"
                 disabled={isFormBusy}
               >
                 適用
@@ -760,13 +768,13 @@ const PolishForm: React.FC<Props> = () => {
         )}
       </section>
 
-      <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 md:p-6">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold text-slate-700">編集キー（詳細）</h2>
           <button
             type="button"
             onClick={() => setShowAdvanced((current) => !current)}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-700 hover:border-slate-400"
+            className="min-h-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:border-slate-400 sm:text-xs"
           >
             {showAdvanced ? "閉じる" : "表示"}
           </button>
@@ -778,12 +786,12 @@ const PolishForm: React.FC<Props> = () => {
                 type="text"
                 value={writeKey}
                 readOnly
-                className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+                className="min-h-11 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm"
               />
               <button
                 type="button"
                 onClick={() => handleCopyText(writeKey)}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:border-slate-400 disabled:opacity-60"
+            className="min-h-11 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:border-slate-400 disabled:opacity-60"
             disabled={!writeKey}
           >
             コピー
@@ -795,13 +803,13 @@ const PolishForm: React.FC<Props> = () => {
                 value={writeKeyInput}
                 onChange={(event) => setWriteKeyInput(event.target.value)}
                 placeholder="共有する編集キーを入力"
-                className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                className="min-h-11 flex-1 rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
                 disabled={isFormBusy}
               />
               <button
                 type="button"
                 onClick={handleApplyWriteKey}
-                className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200 disabled:opacity-60"
+                className="min-h-11 rounded-lg bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-200 disabled:opacity-60"
                 disabled={isFormBusy}
               >
                 適用
@@ -814,13 +822,13 @@ const PolishForm: React.FC<Props> = () => {
         )}
       </section>
 
-      <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 md:p-6">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold text-slate-700">AI加工結果</h2>
           <button
             type="button"
             onClick={() => handleCopyText(polishedText)}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:border-slate-400 disabled:opacity-60"
+            className="min-h-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:border-slate-400 disabled:opacity-60 sm:text-xs"
             disabled={!polishedText}
           >
             コピー
@@ -829,19 +837,19 @@ const PolishForm: React.FC<Props> = () => {
         <textarea
           rows={4}
           readOnly
-          className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-900 placeholder:text-slate-400"
+          className="min-h-28 w-full rounded-lg border border-slate-200 bg-slate-50 p-3.5 text-[15px] text-slate-900 placeholder:text-slate-400 sm:text-sm"
           value={polishedText}
           placeholder="AI加工結果がここに表示されます"
         />
       </section>
 
-      <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 md:p-6">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold text-slate-700">フレーズ一覧</h2>
           <button
             type="button"
             onClick={() => void fetchPhrases(bucketId)}
-            className="flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:border-slate-400 disabled:opacity-60"
+            className="flex min-h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:border-slate-400 disabled:opacity-60 sm:text-xs"
             disabled={!bucketId || isFetching}
           >
             {isFetching ? (
@@ -861,7 +869,7 @@ const PolishForm: React.FC<Props> = () => {
             {phrases.map((phrase) => (
               <li
                 key={phrase.id}
-                className={`rounded-xl border border-slate-200 p-4 shadow-sm transition-all ${
+                className={`rounded-xl border border-slate-200 p-4 shadow-sm transition-all sm:p-4 ${
                   deletingIds.has(phrase.id)
                     ? "opacity-0 blur-sm"
                     : "opacity-100"
@@ -878,21 +886,21 @@ const PolishForm: React.FC<Props> = () => {
                     <button
                       type="button"
                       onClick={() => handleCopyText(phrase.text)}
-                      className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-700 hover:border-slate-400"
+                      className="min-h-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:border-slate-400 sm:min-h-8 sm:px-3 sm:py-1 sm:text-xs"
                     >
                       コピー
                     </button>
                     <button
                       type="button"
                       onClick={() => handlePolishPhrase(phrase)}
-                      className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-700 hover:border-slate-400"
+                      className="min-h-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:border-slate-400 sm:min-h-8 sm:px-3 sm:py-1 sm:text-xs"
                     >
                       AI加工
                     </button>
                     <button
                       type="button"
                       onClick={() => void handleDeletePhrase(phrase.id)}
-                      className="flex items-center gap-1 rounded-lg border border-red-200 bg-white px-3 py-1 text-xs font-bold text-red-600 hover:border-red-400 disabled:opacity-60"
+                      className="flex min-h-10 items-center gap-1 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-bold text-red-600 hover:border-red-400 disabled:opacity-60 sm:min-h-8 sm:px-3 sm:py-1 sm:text-xs"
                       disabled={isReadOnly || deletingIds.has(phrase.id)}
                     >
                       {deletingIds.has(phrase.id) ? (
