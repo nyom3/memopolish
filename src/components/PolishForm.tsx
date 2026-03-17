@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import { hasSupabaseConfig, supabaseClient } from "@/lib/supabaseClient";
 
@@ -42,6 +42,7 @@ const maxTextLength = 2000;
 const maxPhraseCount = 200;
 const expirationDays = 7;
 const toastDurationMs = 2400;
+const urlPattern = /https?:\/\/[^\s]+/g;
 
 // 共有ID/編集キー用の簡易URLセーフ変換
 const toBase64Url = (bytes: Uint8Array): string => {
@@ -96,6 +97,65 @@ const formatDateTime = (value: string): string => {
   return date.toLocaleString("ja-JP", { hour12: false });
 };
 
+const splitTrailingPunctuation = (value: string): { url: string; trailing: string } => {
+  const match = value.match(/^(.*?)([.,!?)]*)$/);
+
+  if (!match) {
+    return { url: value, trailing: "" };
+  }
+
+  return {
+    url: match[1] || value,
+    trailing: match[2] || "",
+  };
+};
+
+const renderTextWithLinks = (value: string): ReactNode => {
+  const matches = Array.from(value.matchAll(urlPattern));
+
+  if (matches.length === 0) {
+    return value;
+  }
+
+  const nodes: ReactNode[] = [];
+  let lastIndex = 0;
+
+  matches.forEach((match, index) => {
+    const rawUrl = match[0];
+    const matchIndex = match.index ?? 0;
+
+    if (lastIndex < matchIndex) {
+      nodes.push(value.slice(lastIndex, matchIndex));
+    }
+
+    const { url, trailing } = splitTrailingPunctuation(rawUrl);
+
+    nodes.push(
+      <a
+        key={`${url}-${matchIndex}-${index}`}
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        className="break-all text-sky-700 underline underline-offset-2 hover:text-sky-800"
+      >
+        {url}
+      </a>,
+    );
+
+    if (trailing) {
+      nodes.push(trailing);
+    }
+
+    lastIndex = matchIndex + rawUrl.length;
+  });
+
+  if (lastIndex < value.length) {
+    nodes.push(value.slice(lastIndex));
+  }
+
+  return nodes;
+};
+
 const PolishForm: React.FC<Props> = () => {
   const [text, setText] = useState<string>("");
   const [lastSavedText, setLastSavedText] = useState<string>("");
@@ -118,6 +178,7 @@ const PolishForm: React.FC<Props> = () => {
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
 
   const toastTimeouts = useRef<Map<string, number>>(new Map());
+  const phraseInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   const isFormBusy = isSaving || isPolishing;
   const isReadOnly = writeKeyHash.length === 0;
@@ -192,6 +253,10 @@ const PolishForm: React.FC<Props> = () => {
       activeTimeouts.forEach((timeoutId) => window.clearTimeout(timeoutId));
       activeTimeouts.clear();
     };
+  }, []);
+
+  useEffect(() => {
+    phraseInputRef.current?.focus();
   }, []);
 
   const resetMessages = (): void => {
@@ -608,6 +673,7 @@ const PolishForm: React.FC<Props> = () => {
             フレーズ入力
           </label>
           <textarea
+            ref={phraseInputRef}
             id="phrase-input"
             rows={6}
             className="min-h-36 w-full rounded-lg border border-slate-200 p-3.5 text-[15px] text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none sm:text-sm"
@@ -834,13 +900,17 @@ const PolishForm: React.FC<Props> = () => {
             コピー
           </button>
         </div>
-        <textarea
-          rows={4}
-          readOnly
-          className="min-h-28 w-full rounded-lg border border-slate-200 bg-slate-50 p-3.5 text-[15px] text-slate-900 placeholder:text-slate-400 sm:text-sm"
-          value={polishedText}
-          placeholder="AI加工結果がここに表示されます"
-        />
+        <div className="min-h-28 w-full rounded-lg border border-slate-200 bg-slate-50 p-3.5 text-[15px] text-slate-900 sm:text-sm">
+          {polishedText ? (
+            <p className="whitespace-pre-wrap break-words select-text">
+              {renderTextWithLinks(polishedText)}
+            </p>
+          ) : (
+            <p className="whitespace-pre-wrap break-words text-slate-400">
+              AI加工結果がここに表示されます
+            </p>
+          )}
+        </div>
       </section>
 
       <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 md:p-6">
@@ -876,8 +946,8 @@ const PolishForm: React.FC<Props> = () => {
                 }`}
               >
                 <div className="space-y-2">
-                  <p className="whitespace-pre-wrap text-sm text-slate-800">
-                    {phrase.text}
+                  <p className="whitespace-pre-wrap break-words text-sm text-slate-800">
+                    {renderTextWithLinks(phrase.text)}
                   </p>
                   <p className="text-xs text-slate-400">
                     作成: {formatDateTime(phrase.created_at)}

@@ -97,6 +97,30 @@ AI 加工は任意機能であり、主要価値は「認証なしでも軽く�
 - `src/components/PolishForm.tsx` の大規模分割や再構成は、通常の機能修正とは分けて別タスクで扱う
 
 ## Documentation Rules
+task 開始時は docs 全体を走査せず、最小限の文脈から開始します。
+
+### Documentation reading order
+まず読むもの:
+
+- `docs/ai-context.md`
+- `docs/engineering-principles.md`
+- `docs/repo-map.md`
+
+必要時のみ読むもの:
+
+- `spec.md`
+- `docs/app-overview.md`
+- `README.md`
+- `tech-stack.md`
+- `how-to-work.md`
+- `dev-instruction.md`
+
+原則:
+- まずこの repo の AGENTS.md を確認する
+- task 開始時に docs 全体を最初から順に読まない
+- 常読対象で足りる範囲から着手し、不足分だけを追加で読む
+- exploratory なメモや補助資料は必要な task のときだけ参照する
+
 最低限更新候補に含めるもの:
 
 - `spec.md`
