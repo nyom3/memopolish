@@ -1,8 +1,8 @@
 ﻿import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const maxInputLength = 2000;
-const maxExtraInstructionLength = 500;
+import { validateExtraInstruction, validatePhraseText } from "@/lib/phraseValidation";
+
 const geminiApiKey = process.env.GEMINI_API_KEY ?? "";
 
 type PolishMode = "polish" | "keigo" | "keypoints";
@@ -26,13 +26,14 @@ export async function POST(request: Request) {
       (await request.json()) as PolishRequestBody;
 
     // 入力バリデーション
-    if (!text || typeof text !== "string" || text.trim() === "") {
+    if (!text || typeof text !== "string") {
       return NextResponse.json({ error: "テキストを入力してください。" }, { status: 400 });
     }
 
-    if (text.length > maxInputLength) {
+    const textValidationError = validatePhraseText(text);
+    if (textValidationError) {
       return NextResponse.json(
-        { error: `テキストは${maxInputLength}文字以内で入力してください。` },
+        { error: textValidationError.replace("フレーズ", "テキスト") },
         { status: 400 }
       );
     }
@@ -52,16 +53,16 @@ export async function POST(request: Request) {
       );
     }
 
-    if (
-      typeof extraInstruction === "string" &&
-      extraInstruction.length > maxExtraInstructionLength
-    ) {
-      return NextResponse.json(
-        {
-          error: `追加指示は${maxExtraInstructionLength}文字以内で入力してください。`,
-        },
-        { status: 400 }
-      );
+    if (typeof extraInstruction === "string") {
+      const extraInstructionValidationError = validateExtraInstruction(extraInstruction);
+      if (extraInstructionValidationError) {
+        return NextResponse.json(
+          {
+            error: extraInstructionValidationError,
+          },
+          { status: 400 }
+        );
+      }
     }
 
     // Gemini モデル初期化

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { phraseMaxCount } from "@/lib/phraseConstraints";
+import { isSha256Hex, isValidBucketId } from "@/lib/phraseValidation";
 import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabaseAdmin";
 
 type CleanupPayload = {
@@ -7,12 +9,6 @@ type CleanupPayload = {
   writeKeyHash?: string;
   maxPhraseCount?: number;
 };
-
-// 受け取れなかった場合の上限
-const fallbackMaxPhraseCount = 200;
-
-const isValidBucketId = (value: string): boolean => value.length >= 22;
-const isSha256Hex = (value: string): boolean => /^[0-9a-f]{64}$/i.test(value);
 
 export async function POST(request: Request) {
   if (!hasSupabaseAdminConfig || !supabaseAdmin) {
@@ -33,7 +29,7 @@ export async function POST(request: Request) {
   const maxCount =
     typeof payload.maxPhraseCount === "number" && payload.maxPhraseCount > 0
       ? payload.maxPhraseCount
-      : fallbackMaxPhraseCount;
+      : phraseMaxCount;
 
   if (!bucketId || !writeKeyHash) {
     return NextResponse.json(

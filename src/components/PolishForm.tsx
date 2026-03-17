@@ -2,6 +2,14 @@
 
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  bucketIdMinLength,
+  phraseExpirationDays,
+  phraseMaxCount,
+  phraseMaxLength,
+  writeKeyLength,
+} from "@/lib/phraseConstraints";
+import { isValidBucketId, validatePhraseText } from "@/lib/phraseValidation";
 import { hasSupabaseConfig, supabaseClient } from "@/lib/supabaseClient";
 
 type Phrase = {
@@ -36,11 +44,6 @@ type ToastItem = {
 // localStorage に保存するキー名
 const bucketStorageKey = "phrasebridge_bucket_id";
 const writeKeyStorageKey = "phrasebridge_write_key";
-const minBucketLength = 22;
-const writeKeyLength = 32;
-const maxTextLength = 2000;
-const maxPhraseCount = 200;
-const expirationDays = 7;
 const toastDurationMs = 2400;
 const urlPattern = /https?:\/\/[^\s]+/g;
 
@@ -84,8 +87,6 @@ const isExpired = (expiresAt: string | null): boolean => {
 
   return new Date(expiresAt).getTime() < Date.now();
 };
-
-const isValidBucketId = (value: string): boolean => value.length >= minBucketLength;
 
 const formatDateTime = (value: string): string => {
   const date = new Date(value);
@@ -180,7 +181,7 @@ const PolishForm: React.FC<Props> = () => {
   const isFormBusy = isSaving || isPolishing;
   const isReadOnly = writeKeyHash.length === 0;
 
-  const remainingChars = useMemo<number>(() => maxTextLength - text.length, [text]);
+  const remainingChars = useMemo<number>(() => phraseMaxLength - text.length, [text]);
   const isDirty = useMemo<boolean>(() => {
     const trimmed = text.trim();
     if (!trimmed) {
@@ -199,7 +200,7 @@ const PolishForm: React.FC<Props> = () => {
     const nextBucketId =
       storedBucketId && isValidBucketId(storedBucketId)
         ? storedBucketId
-        : generateRandomId(minBucketLength);
+        : generateRandomId(bucketIdMinLength);
 
     if (!storedBucketId || storedBucketId !== nextBucketId) {
       localStorage.setItem(bucketStorageKey, nextBucketId);
@@ -301,7 +302,7 @@ const PolishForm: React.FC<Props> = () => {
       .select("id, text, created_at, expires_at")
       .eq("bucket_id", activeBucketId)
       .order("created_at", { ascending: false })
-      .limit(maxPhraseCount);
+      .limit(phraseMaxCount);
 
     if (error) {
       console.error("Failed to fetch phrases:", error);
@@ -344,7 +345,7 @@ const PolishForm: React.FC<Props> = () => {
         body: JSON.stringify({
           bucketId: activeBucketId,
           writeKeyHash,
-          maxPhraseCount,
+          phraseMaxCount,
         }),
       });
 
@@ -368,20 +369,6 @@ const PolishForm: React.FC<Props> = () => {
     }
   };
 
-  const validateText = (value: string): string | null => {
-    const trimmed = value.trim();
-
-    if (!trimmed) {
-      return "フレーズを入力してください。";
-    }
-
-    if (trimmed.length > maxTextLength) {
-      return `フレーズは${maxTextLength}文字以内で入力してください。`;
-    }
-
-    return null;
-  };
-
   // 保存 → cleanup → 再取得の順でUIを更新
   const savePhrase = async (
     value: string,
@@ -393,7 +380,7 @@ const PolishForm: React.FC<Props> = () => {
       return false;
     }
 
-    const validationError = validateText(value);
+    const validationError = validatePhraseText(value);
     if (validationError) {
       setErrorMessage(validationError);
       pushToast(validationError, "error");
@@ -416,7 +403,7 @@ const PolishForm: React.FC<Props> = () => {
     resetMessages();
 
     const expiresAt = new Date(
-      Date.now() + expirationDays * 24 * 60 * 60 * 1000
+      Date.now() + phraseExpirationDays * 24 * 60 * 60 * 1000
     ).toISOString();
 
     const { error } = await supabaseClient.from("phrases").insert({
@@ -472,7 +459,7 @@ const PolishForm: React.FC<Props> = () => {
 
   // AI加工（polish / keigo / keypoints）
   const requestPolish = async (value: string): Promise<string | null> => {
-    const validationError = validateText(value);
+    const validationError = validatePhraseText(value);
     if (validationError) {
       setErrorMessage(validationError);
       pushToast(validationError, "error");
@@ -620,8 +607,8 @@ const PolishForm: React.FC<Props> = () => {
   const handleApplyBucket = async (): Promise<void> => {
     const trimmed = bucketInput.trim();
     if (!isValidBucketId(trimmed)) {
-      setErrorMessage(`共有ルームIDは${minBucketLength}文字以上で入力してください。`);
-      pushToast(`共有ルームIDは${minBucketLength}文字以上で入力してください。`, "error");
+      setErrorMessage(`共有ルームIDは${bucketIdMinLength}文字以上で入力してください。`);
+      pushToast(`共有ルームIDは${bucketIdMinLength}文字以上で入力してください。`, "error");
       return;
     }
 
@@ -681,7 +668,7 @@ const PolishForm: React.FC<Props> = () => {
           />
           <div className="flex items-center justify-between text-xs text-slate-500">
             <span>残り{remainingChars}文字</span>
-            <span>最大{maxTextLength}文字</span>
+            <span>最大{phraseMaxLength}文字</span>
           </div>
           <p
             className={`text-xs ${

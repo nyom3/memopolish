@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { isSha256Hex, isValidBucketId } from "@/lib/phraseValidation";
 import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabaseAdmin";
 
 type DeletePayload = {
@@ -13,10 +14,6 @@ const isUuid = (value: string): boolean =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value
   );
-
-const isValidBucketId = (value: string): boolean => value.length >= 22;
-
-const isSha256Hex = (value: string): boolean => /^[0-9a-f]{64}$/i.test(value);
 
 export async function POST(request: Request) {
   if (!hasSupabaseAdminConfig || !supabaseAdmin) {
