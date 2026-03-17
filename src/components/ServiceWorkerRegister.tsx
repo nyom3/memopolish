@@ -15,6 +15,20 @@ const ServiceWorkerRegister: React.FC<Props> = () => {
       return;
     }
 
+    if (process.env.NODE_ENV !== "production") {
+      const unregister = async (): Promise<void> => {
+        try {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(registrations.map((registration) => registration.unregister()));
+        } catch (error) {
+          console.error("Failed to unregister service workers:", error);
+        }
+      };
+
+      void unregister();
+      return;
+    }
+
     const register = async (): Promise<void> => {
       try {
         await navigator.serviceWorker.register("/sw.js");
