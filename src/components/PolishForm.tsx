@@ -98,15 +98,12 @@ const formatDateTime = (value: string): string => {
 };
 
 const splitTrailingPunctuation = (value: string): { url: string; trailing: string } => {
-  const match = value.match(/^(.*?)([.,!?。、！？)）\]】」』]*)$/);
-
-  if (!match) {
-    return { url: value, trailing: "" };
-  }
+  const validUrlMatch = value.match(/^https?:\/\/[A-Za-z0-9\-._~:/?#[\]@!$&'()*+,;=%]*/);
+  const url = validUrlMatch?.[0] ?? value;
 
   return {
-    url: match[1] || value,
-    trailing: match[2] || "",
+    url,
+    trailing: value.slice(url.length),
   };
 };
 
