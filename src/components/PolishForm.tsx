@@ -98,7 +98,7 @@ const formatDateTime = (value: string): string => {
 };
 
 const splitTrailingPunctuation = (value: string): { url: string; trailing: string } => {
-  const match = value.match(/^(.*?)([.,!?)]*)$/);
+  const match = value.match(/^(.*?)([.,!?。、！？)）\]】」』]*)$/);
 
   if (!match) {
     return { url: value, trailing: "" };
