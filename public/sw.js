@@ -44,6 +44,10 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  if (request.mode === "navigate") {
+    return;
+  }
+
   if (requestUrl.pathname.startsWith("/api/")) {
     return;
   }
