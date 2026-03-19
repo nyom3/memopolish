@@ -11,6 +11,7 @@ import {
 } from "@/lib/phraseConstraints";
 import { isValidBucketId, validatePhraseText } from "@/lib/phraseValidation";
 import { hasSupabaseConfig, supabaseClient } from "@/lib/supabaseClient";
+import { splitTextWithUrls } from "@/lib/urlText";
 
 type Phrase = {
   id: string;
@@ -45,7 +46,6 @@ type ToastItem = {
 const bucketStorageKey = "phrasebridge_bucket_id";
 const writeKeyStorageKey = "phrasebridge_write_key";
 const toastDurationMs = 2400;
-const urlPattern = /https?:\/\/[^\s]+/g;
 
 // 共有ID/編集キー用の簡易URLセーフ変換
 const toBase64Url = (bytes: Uint8Array): string => {
@@ -98,58 +98,33 @@ const formatDateTime = (value: string): string => {
   return date.toLocaleString("ja-JP", { hour12: false });
 };
 
-const splitTrailingPunctuation = (value: string): { url: string; trailing: string } => {
-  const validUrlMatch = value.match(/^https?:\/\/[A-Za-z0-9\-._~:/?#[\]@!$&'()*+,;=%]*/);
-  const url = validUrlMatch?.[0] ?? value;
-
-  return {
-    url,
-    trailing: value.slice(url.length),
-  };
-};
-
 const renderTextWithLinks = (value: string): ReactNode => {
-  const matches = Array.from(value.matchAll(urlPattern));
+  const segments = splitTextWithUrls(value);
 
-  if (matches.length === 0) {
+  if (segments.length === 1 && segments[0].type === "text") {
     return value;
   }
 
   const nodes: ReactNode[] = [];
-  let lastIndex = 0;
 
-  matches.forEach((match, index) => {
-    const rawUrl = match[0];
-    const matchIndex = match.index ?? 0;
-
-    if (lastIndex < matchIndex) {
-      nodes.push(value.slice(lastIndex, matchIndex));
+  segments.forEach((segment, index) => {
+    if (segment.type === "text") {
+      nodes.push(segment.value);
+      return;
     }
-
-    const { url, trailing } = splitTrailingPunctuation(rawUrl);
 
     nodes.push(
       <a
-        key={`${url}-${matchIndex}-${index}`}
-        href={url}
+        key={`${segment.value}-${index}`}
+        href={segment.value}
         target="_blank"
         rel="noreferrer"
         className="break-all text-sky-700 underline underline-offset-2 hover:text-sky-800"
       >
-        {url}
+        {segment.value}
       </a>,
     );
-
-    if (trailing) {
-      nodes.push(trailing);
-    }
-
-    lastIndex = matchIndex + rawUrl.length;
   });
-
-  if (lastIndex < value.length) {
-    nodes.push(value.slice(lastIndex));
-  }
 
   return nodes;
 };
