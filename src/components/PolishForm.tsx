@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   bucketIdMinLength,
@@ -288,35 +288,38 @@ const PolishForm: React.FC<Props> = () => {
   };
 
   // 共有ルームIDごとに最新順で取得
-  async function fetchPhrases(activeBucketId: string): Promise<boolean> {
-    if (!supabaseClient || !hasSupabaseConfig) {
-      setErrorMessage("Supabaseの設定が見つかりません。");
-      return false;
-    }
+  const fetchPhrases = useCallback(
+    async (activeBucketId: string): Promise<boolean> => {
+      if (!supabaseClient || !hasSupabaseConfig) {
+        setErrorMessage("Supabaseの設定が見つかりません。");
+        return false;
+      }
 
-    setIsFetching(true);
-    resetMessages();
+      setIsFetching(true);
+      resetMessages();
 
-    const { data, error } = await supabaseClient
-      .from("phrases")
-      .select("id, text, created_at, expires_at")
-      .eq("bucket_id", activeBucketId)
-      .order("created_at", { ascending: false })
-      .limit(phraseMaxCount);
+      const { data, error } = await supabaseClient
+        .from("phrases")
+        .select("id, text, created_at, expires_at")
+        .eq("bucket_id", activeBucketId)
+        .order("created_at", { ascending: false })
+        .limit(phraseMaxCount);
 
-    if (error) {
-      console.error("Failed to fetch phrases:", error);
-      setErrorMessage("フレーズの取得に失敗しました。");
-      pushToast("フレーズの取得に失敗しました。", "error");
+      if (error) {
+        console.error("Failed to fetch phrases:", error);
+        setErrorMessage("フレーズの取得に失敗しました。");
+        pushToast("フレーズの取得に失敗しました。", "error");
+        setIsFetching(false);
+        return false;
+      }
+
+      const filtered = (data ?? []).filter((phrase) => !isExpired(phrase.expires_at));
+      setPhrases(filtered);
       setIsFetching(false);
-      return false;
-    }
-
-    const filtered = (data ?? []).filter((phrase) => !isExpired(phrase.expires_at));
-    setPhrases(filtered);
-    setIsFetching(false);
-    return true;
-  }
+      return true;
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!bucketId || !hasSupabaseConfig || !supabaseClient) {
@@ -326,7 +329,7 @@ const PolishForm: React.FC<Props> = () => {
     queueMicrotask(() => {
       void fetchPhrases(bucketId);
     });
-  }, [bucketId]);
+  }, [bucketId, fetchPhrases]);
 
   // サーバ側で期限切れ/件数超過の整理を実施
   const cleanupOverflow = async (activeBucketId: string): Promise<boolean> => {
