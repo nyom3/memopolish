@@ -64,18 +64,21 @@ AI 加工は任意機能であり、主要価値は「認証なしでも軽く�
 基本コマンド:
 
 - `npm run dev`
+- `npm test`
 - `npm run build`
 - `npm run lint`
 - `npm run start`
 
 確認の優先順:
 1. 変更箇所のローカル動作確認
-2. `npm run lint`
-3. `npm run build`
+2. `npm test`（`test` script が存在し、変更内容に関連する場合）
+3. `npm run lint`
+4. `npm run build`
 
 テストについて:
-- 現時点で整備済みの自動テストはない
+- 現時点では `npm test` で実行できる最小限の自動テストがある
 - 重要ロジックを触る場合は、最低限のテスト追加を検討する
+- pure logic、validation、helper、変換処理を触る変更では `npm test` を確認対象に含める
 - テストを追加しない場合は、手動確認内容を明記する
 
 ## Implementation Rules

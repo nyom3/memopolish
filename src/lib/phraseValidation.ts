@@ -2,7 +2,7 @@ import {
   bucketIdMinLength,
   extraInstructionMaxLength,
   phraseMaxLength,
-} from "@/lib/phraseConstraints";
+} from "./phraseConstraints";
 
 // PhraseBridge の入力制約で再利用する pure な validation 群。
 // route 固有の認可や DB 検証はここに含めない。
