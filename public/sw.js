@@ -1,10 +1,39 @@
-const CACHE_NAME = "phrasebridge-shell-v1";
+const CACHE_NAME = "phrasebridge-shell-v2";
 const PRECACHE_URLS = [
-  "/",
   "/manifest.webmanifest",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
 ];
+
+const PRECACHE_PATHS = new Set(PRECACHE_URLS);
+
+const isCacheAllowed = (request, requestUrl) => {
+  if (request.mode === "navigate" || request.destination === "document") {
+    return false;
+  }
+
+  if (requestUrl.pathname.startsWith("/api/")) {
+    return false;
+  }
+
+  if (requestUrl.pathname === "/sw.js") {
+    return false;
+  }
+
+  if (requestUrl.pathname.startsWith("/_next/data/")) {
+    return false;
+  }
+
+  if (PRECACHE_PATHS.has(requestUrl.pathname)) {
+    return true;
+  }
+
+  if (requestUrl.pathname.startsWith("/_next/static/")) {
+    return true;
+  }
+
+  return false;
+};
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -44,15 +73,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (request.mode === "navigate") {
-    return;
-  }
-
-  if (requestUrl.pathname.startsWith("/api/")) {
-    return;
-  }
-
-  if (requestUrl.pathname === "/sw.js") {
+  if (!isCacheAllowed(request, requestUrl)) {
     return;
   }
 
