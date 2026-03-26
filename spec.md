@@ -62,18 +62,38 @@ AI 加工（推敲 / 敬語化 / 要点抽出）は任意機能で、通常の�
 
 - `bucket_id` で最新順に取得
 - `expires_at` が過去の行は非表示
+- クライアントは anon key で Supabase に直接 `select` する
 
 ### 7.3. 削除
 
 - サーバAPIで `id + bucket_id + write_key_hash` を検証
 - 一致しない場合は 403 / 不存在は 404
+- クライアントから Supabase へ直接 `delete` は行わない
 
 ### 7.4. cleanup
 
 1) expires_at が過去の行を削除  
 2) created_at DESC で最新200件を残し、超過分を削除
+3) cleanup はサーバAPIから service role で実行する
 
-## 8. API
+## 8. RLS 方針
+
+`phrases` テーブルは RLS を有効化する。
+
+- `select`: `anon` に許可
+- `insert`: `anon` に許可
+- `update`: 不許可
+- `delete`: クライアントからは不許可
+
+補足:
+
+- このアプリは認証なしのため、RLS だけで caller ごとの `bucket_id` 制御を厳密には表現しない
+- 一覧取得はアプリ側で常に `bucket_id` を付けて問い合わせる
+- 保存はクライアントの anon key で `insert` する
+- 削除と cleanup は `/api/phrases/delete` `/api/phrases/cleanup` から service role で実行する
+- `write_key_hash` は削除と cleanup の API 入力検証に使い、平文の `write_key` は保存しない
+
+## 9. API
 
 - `POST /api/polish`（Gemini API）
   - request: `{ text, mode, extraInstruction? }`
@@ -82,19 +102,19 @@ AI 加工（推敲 / 敬語化 / 要点抽出）は任意機能で、通常の�
 - `POST /api/phrases/delete`（削除）
 - `POST /api/phrases/cleanup`（200件整理）
 
-## 9. PWA
+## 10. PWA
 
 - `public/manifest.webmanifest` と `public/sw.js` を使用
 - アプリシェルと静的アセットのみキャッシュ
 - API レスポンスはキャッシュしない
 
-## 10. 制約
+## 11. 制約
 
 - 認証なし（MVP）
 - 複雑な状態管理は使わない
 - モバイル対応
 
-## 11. Definition of Done
+## 12. Definition of Done
 
 - 同じ bucket_id で 2端末の同期が取れる
 - 保存/削除が write_key で保護される
