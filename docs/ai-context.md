@@ -59,9 +59,12 @@ AI 加工は保存フローの補助機能であり、必須ではない。通�
 - 1 画面完結を優先する
 - UI にサーバ責務や秘密情報を寄せすぎない
 - 外部接続は既存の API / lib 分離を守る
-- `bucket_id` と `write_key` と `write_key_hash` の役割を混ぜない
-- AI 加工は API 境界で入力制約と出力ポリシーを守る
+- 鍵の役割と AI 境界の硬い条件は `docs/invariants.yml` を参照する
+  <!-- invariant: KEY_ROLE_SEPARATION -->
+  <!-- invariant: AI_API_BOUNDARY -->
+  <!-- invariant: AI_OUTPUT_FIDELITY -->
 - `PolishForm.tsx` は中核だが、大規模再構成は通常タスクと分ける
+  <!-- invariant: CORE_LOCAL_CHANGE_ONLY -->
 
 ## UX 方針
 
@@ -76,19 +79,17 @@ AI 加工は保存フローの補助機能であり、必須ではない。通�
 - 認証機能の追加
 - 複雑な状態管理の導入
 - AI を前提にした保存フローへの変更
-- UI からの service role key 相当処理
-- API レスポンスの PWA キャッシュ
+- UI 権限処理と PWA API キャッシュの硬い禁止条件は `docs/invariants.yml` を参照する
+  <!-- invariant: SERVICE_ROLE_KEY_SERVER_ONLY -->
+  <!-- invariant: NO_SW_API_CACHE -->
 - 要確認: 共有リンク、招待、履歴検索などの高度共有機能
 
 ## 制約
 
-- `bucket_id` は 22 文字以上
-- `write_key` 平文は DB に保存しない
-- `write_key_hash` はサーバ送信用
-- フレーズは 2000 文字以内
-- `extraInstruction` は 500 文字以内
-- 期限切れは 7 日
-- 1 bucket あたり最大 200 件
+- 制約値、write key 保存、サーバ送信用キーの硬い条件は `docs/invariants.yml` を参照する
+  <!-- invariant: LIMITS_STABILITY -->
+  <!-- invariant: WRITE_KEY_NOT_IN_DB -->
+  <!-- invariant: KEY_ROLE_SEPARATION -->
 
 ## 今後の拡張余地
 
