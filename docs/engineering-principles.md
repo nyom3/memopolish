@@ -14,7 +14,8 @@
   - 依頼と無関係な整形、大規模分割、命名変更、責務再配置を同時に行わない
 - follow existing patterns
   - 既存の App Router、API ルート、Supabase wrapper、`@/*` import を踏襲する
-  - クライアント接続は `src/lib/supabaseClient.ts`、サーバ接続は `src/lib/supabaseAdmin.ts` を使う
+  - Supabase 接続境界は `docs/invariants.yml` の `SUPABASE_CLIENT_ADMIN_SEPARATION` を参照する
+    <!-- invariant: SUPABASE_CLIENT_ADMIN_SEPARATION -->
 - avoid speculative expansion
   - 将来必要そうという理由だけで機能、抽象化、設定項目を増やさない
   - 不明な仕様は `要確認` として止める
@@ -44,32 +45,31 @@
 
 - `page.tsx` は薄く保つ
 - UI は表示とユーザー操作を担う
-- 外部 I/O、削除権限判定、cleanup、Gemini 呼び出しは API / lib 側で扱う
-- `SUPABASE_SERVICE_ROLE_KEY` をクライアントに渡さない
-- UI から Gemini を直接呼ばない
+- 外部 I/O、削除権限判定、cleanup、Gemini 呼び出しの硬い境界は `docs/invariants.yml` を参照する
+  <!-- invariant: SERVICE_ROLE_KEY_SERVER_ONLY -->
+  <!-- invariant: AI_API_BOUNDARY -->
+  <!-- invariant: PROTECT_DELETE_CLEANUP -->
+  <!-- invariant: SUPABASE_CLIENT_ADMIN_SEPARATION -->
 
 ## データとセキュリティ
 
-- `bucket_id` は共有キー
-- `write_key` は保存・削除キー
-- `write_key_hash` はサーバ送信用
-- これらの役割を混ぜない
-- 削除と cleanup の保護条件を緩めない
-- `write_key` 平文を DB に保存しない
+- 鍵の役割、削除・cleanup、write key 保存に関する硬い条件は `docs/invariants.yml` を参照する
+  <!-- invariant: KEY_ROLE_SEPARATION -->
+  <!-- invariant: WRITE_KEY_NOT_IN_DB -->
+  <!-- invariant: PROTECT_DELETE_CLEANUP -->
 
 ## AI 実装時の原則
 
-- Gemini 呼び出しは `src/app/api/polish/route.ts` に集約する
-- 入力長、mode、追加指示の検証を API 境界で維持する
-- 出力ポリシーを弱めない
-  - 事実追加禁止
-  - 固有名詞、数値、日付の改変禁止
+- AI API 境界と出力忠実性の硬い条件は `docs/invariants.yml` を参照する
+  <!-- invariant: AI_API_BOUNDARY -->
+  <!-- invariant: AI_OUTPUT_FIDELITY -->
 - AI 失敗時でも保存・共有導線は継続可能にする
 
 ## PWA とキャッシュ
 
 - `public/manifest.webmanifest` と `public/sw.js` を前提にする
-- API レスポンスをキャッシュしない
+- API キャッシュの硬い条件は `docs/invariants.yml` を参照する
+  <!-- invariant: NO_SW_API_CACHE -->
 - PWA を触る変更ではホーム画面追加と起動確認まで考慮する
 
 ## ドキュメント運用

@@ -1,0 +1,79 @@
+- id: KEY_ROLE_SEPARATION
+  statement: bucket_id / write_key / write_key_hash の役割を混在させない
+  severity: critical
+  triggers: [鍵の取得・受け渡し, env参照追加, client/admin wrapper境界, 保存・削除フロー変更]
+  rationale: 共有キー、編集キー、サーバ送信用ハッシュの混同は権限境界の破壊につながる
+  check: write_key 平文が fetch ボディや DB insert に渡る経路がなく、writeKeyHash と bucketId が別フィールドのまま、hashSha256 によるハッシュ化が迂回されていない
+  ref: AGENTS.md
+
+- id: WRITE_KEY_NOT_IN_DB
+  statement: write_key 平文を DB に保存しない
+  severity: critical
+  triggers: [保存 API 変更, Supabase insert/update 変更, DB スキーマ変更, localStorage 処理変更]
+  rationale: 平文の編集キー保存は漏洩時に保存・削除権限の侵害につながる
+  check: src/components/PolishForm.tsx の supabaseClient.from("phrases").insert(...) 引数オブジェクトが write_key_hash のみを持ち、write_key 平文キーや writeKey 変数の値が混入していない(現状 phrases への update 経路はなし)
+  ref: docs/engineering-principles.md
+
+- id: SERVICE_ROLE_KEY_SERVER_ONLY
+  statement: SUPABASE_SERVICE_ROLE_KEY をクライアントへ渡さず、UI で service role 相当処理をしない
+  severity: critical
+  triggers: [環境変数参照追加, UI 変更, Supabase 接続変更, API ルート移動]
+  rationale: service role key のクライアント露出は権限昇格とデータ漏洩に直結する
+  check: client component や src/components 配下が supabaseAdmin や SUPABASE_SERVICE_ROLE_KEY を import / 参照せず、SUPABASE_SERVICE_ROLE_KEY に NEXT_PUBLIC_ プレフィックスが付与されていない
+  ref: AGENTS.md
+
+- id: PROTECT_DELETE_CLEANUP
+  statement: 削除と cleanup の保護条件を緩めない
+  severity: critical
+  triggers: [削除 API 変更, cleanup API 変更, writeKeyHash 検証変更, 件数上限処理変更]
+  rationale: 保護条件の緩和は他端末・他 bucket のデータ削除につながる
+  check: delete が id / bucketId / writeKeyHash の形式検証と .eq("write_key_hash") 照合を維持し、cleanup が期限切れ条件(expires_at)・件数上限・writeKeyHash 照合をいずれも維持している
+  ref: docs/engineering-principles.md
+
+- id: AI_OUTPUT_FIDELITY
+  statement: AI 出力で新規事実を追加せず、固有名詞・数値・日付を改変しない
+  severity: critical
+  triggers: [AI プロンプト変更, AI モード追加, 出力整形変更, Gemini モデル変更]
+  rationale: 入力にない事実や重要情報の改変はメモ内容の信頼性を壊す
+  check: AI モードの追加・変更 diff で modeInstruction または共通プロンプト(fullPrompt)に事実不追加・固有名詞/数値/日付の不改変制約が含まれ、既存モードの当該制約文が削除されていない
+  ref: docs/engineering-principles.md
+
+- id: AI_API_BOUNDARY
+  statement: Gemini 呼び出しは polish/route.ts に集約し、UI から直接呼ばず、入力長・mode・追加指示の検証を API 境界で維持する
+  severity: critical
+  triggers: [AI 呼び出し追加, UI 変更, API ルート変更, 入力検証変更, AI モード追加]
+  rationale: AI 接続と検証を API 境界に集約することで秘密情報と入力制約を守る
+  check: Client Component が @google/generative-ai を import せず GEMINI_API_KEY を NEXT_PUBLIC_ で公開しておらず、route.ts の text 長 / mode ホワイトリスト / extraInstruction 長の検証が削除されていない
+  ref: docs/engineering-principles.md
+
+- id: SUPABASE_CLIENT_ADMIN_SEPARATION
+  statement: クライアント側は supabaseClient、サーバ側は supabaseAdmin を使い分ける
+  severity: normal
+  triggers: [Supabase 接続変更, page.tsx 変更, UI コンポーネント変更, API ルート変更]
+  rationale: クライアント接続と管理権限接続を分けることで権限境界を保つ
+  check: src/components は supabaseClient のみ、src/app/api の delete / cleanup は supabaseAdmin のみを使い、両者の import 元が入れ替わっていない
+  ref: docs/engineering-principles.md
+
+- id: NO_SW_API_CACHE
+  statement: Service Worker で API レスポンスをキャッシュしない
+  severity: normal
+  triggers: [public/sw.js 変更, PWA キャッシュ戦略変更, API fetch ハンドリング変更]
+  rationale: API レスポンスのキャッシュは共有内容や権限状態の古い表示につながる
+  check: sw.js の isCacheAllowed が /api/ を除外し続け、/api/ が PRECACHE_URLS やキャッシュ許可集合に追加されておらず、isCacheAllowed を経由しない cache.put が追加されていない
+  ref: docs/engineering-principles.md
+
+- id: CORE_LOCAL_CHANGE_ONLY
+  statement: PolishForm.tsx への変更は局所的に行い、大規模分割や再構成は別タスクで扱う
+  severity: normal
+  triggers: [PolishForm.tsx 変更, UI 責務変更, コンポーネント分割, 大規模リファクタ]
+  rationale: 中核 UI への広範な変更はレビュー困難化と回帰リスクを招く
+  check: 変更が src/components 配下への新規分割ファイル作成や、PolishForm.tsx の関数を別ファイルへ移動する大規模分割・再構成を伴っていない(大規模分割は別タスク)
+  ref: AGENTS.md
+
+- id: LIMITS_STABILITY
+  statement: bucket_id 22文字以上、phrase 2000文字以内、extraInstruction 500文字以内、期限7日、1 bucket 最大200件の変更時は影響を明示する
+  severity: normal
+  triggers: [入力制限変更, cleanup 条件変更, 保存件数上限変更, AI API 検証変更, spec 変更]
+  rationale: 制約値の変更は既存データ、UX、API 検証、cleanup 動作に影響する
+  check: phraseConstraints.ts のエクスポート定数を変更する diff で影響範囲(UI / validation / cleanup / DB)が明示され、制約値が定数 import でなく新規マジックナンバーとしてハードコードされていない
+  ref: docs/ai-context.md

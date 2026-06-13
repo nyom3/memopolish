@@ -39,25 +39,24 @@ AI 加工は任意機能であり、主要価値は「認証なしでも軽く�
 
 ## External Integration Rules
 ### Supabase
-- クライアント側では `src/lib/supabaseClient.ts` を使う
-- サーバ側の削除・cleanup では `src/lib/supabaseAdmin.ts` を使う
-- `SUPABASE_SERVICE_ROLE_KEY` はクライアントへ渡さない
-- `page.tsx` や UI コンポーネントで直接 `createClient` しない
+- Supabase の接続・権限境界に関する硬い条件は `docs/invariants.yml` を参照する
+  <!-- invariant: SUPABASE_CLIENT_ADMIN_SEPARATION -->
+  <!-- invariant: SERVICE_ROLE_KEY_SERVER_ONLY -->
 
 ### Gemini API
-- Gemini 呼び出しは `src/app/api/polish/route.ts` に集約する
-- UI から直接 Gemini を呼ばない
-- 入力制約、許可モード、エラーハンドリングは API 境界で維持する
-- 事実追加禁止、固有名詞や数値の改変禁止など、この repo 固有の出力ポリシーを壊さない
+- Gemini API 境界と出力忠実性に関する硬い条件は `docs/invariants.yml` を参照する
+  <!-- invariant: AI_API_BOUNDARY -->
+  <!-- invariant: AI_OUTPUT_FIDELITY -->
 
 ### localStorage / ブラウザ API
-- `bucket_id` と `write_key` の保持はクライアント側で行う
-- `write_key` の平文は DB に保存しない
-- サーバへ送る値は `write_key_hash` を使う
+- 鍵の役割と保存禁止条件は `docs/invariants.yml` を参照する
+  <!-- invariant: KEY_ROLE_SEPARATION -->
+  <!-- invariant: WRITE_KEY_NOT_IN_DB -->
 
 ### PWA
 - `public/manifest.webmanifest` と `public/sw.js` を前提にする
-- API レスポンスをキャッシュする変更は慎重に扱う
+- API キャッシュに関する硬い条件は `docs/invariants.yml` を参照する
+  <!-- invariant: NO_SW_API_CACHE -->
 - PWA 対応を壊す変更では、ホーム画面追加と起動確認まで行う
 
 ## Build / Lint / Test Commands
@@ -88,16 +87,17 @@ AI 加工は任意機能であり、主要価値は「認証なしでも軽く�
 - `@/*` エイリアスを使う
 - TypeScript の型を維持する
 - 既存の camelCase / PascalCase 命名を崩さない
-- 入力上限、保存件数上限、有効期限などの既存制約を変更する場合は、影響を明示する
+- 入力上限、保存件数上限、有効期限などの硬い制約は `docs/invariants.yml` を参照する
+  <!-- invariant: LIMITS_STABILITY -->
 
 この repo で特に守ること:
-- `bucket_id` は共有キー、`write_key` は編集キー、`write_key_hash` はサーバ送信用という役割を混ぜない
-- 削除と cleanup の保護条件を緩めない
+- 鍵の役割、削除・cleanup、AI 出力、PolishForm の局所変更に関する硬い条件は `docs/invariants.yml` を参照する
+  <!-- invariant: KEY_ROLE_SEPARATION -->
+  <!-- invariant: PROTECT_DELETE_CLEANUP -->
+  <!-- invariant: AI_OUTPUT_FIDELITY -->
+  <!-- invariant: CORE_LOCAL_CHANGE_ONLY -->
 - AI 加工が失敗しても通常の保存・共有フローは壊さない
 - `src/components/PolishForm.tsx` は 900 行超の中核ファイルとして扱う
-- `src/components/PolishForm.tsx` への変更は局所的に行い、依頼範囲に必要な最小差分を優先する
-- `src/components/PolishForm.tsx` を触る際に、関係のない整形や大規模リファクタを同時に行わない
-- `src/components/PolishForm.tsx` の大規模分割や再構成は、通常の機能修正とは分けて別タスクで扱う
 
 ## Documentation Rules
 task 開始時は docs 全体を走査せず、最小限の文脈から開始します。
@@ -161,19 +161,21 @@ task 開始時は docs 全体を走査せず、最小限の文脈から開始し
 Supabase や Gemini の実接続確認ができない場合は、その旨を明記します。
 
 ## Repo-specific Risks or Forbidden Patterns
-- UI で service role key 相当の処理を扱わない
+- 硬い禁止条件は `docs/invariants.yml` を参照する
+  <!-- invariant: SERVICE_ROLE_KEY_SERVER_ONLY -->
+  <!-- invariant: WRITE_KEY_NOT_IN_DB -->
+  <!-- invariant: AI_API_BOUNDARY -->
+  <!-- invariant: AI_OUTPUT_FIDELITY -->
+  <!-- invariant: NO_SW_API_CACHE -->
 - `src/components/PolishForm.tsx` にさらに外部接続やサーバ責務を追加しすぎない
-- `write_key` の平文を DB 保存しない
-- API ルートの入力検証を外さない
-- AI プロンプトの安全制約を軽くしない
-- `sw.js` の変更で API キャッシュを入れない
 
 特に注意する変更:
-- `bucket_id` / `write_key` / `write_key_hash` の仕様変更
-- phrase 上限件数や有効期限の変更
-- Supabase の権限まわり
-- Gemini のプロンプト方針変更
-- PWA キャッシュ戦略の変更
+- 注意対象と対応する正本 ID は `docs/invariants.yml` を参照する
+  <!-- invariant: KEY_ROLE_SEPARATION -->
+  <!-- invariant: LIMITS_STABILITY -->
+  <!-- invariant: SERVICE_ROLE_KEY_SERVER_ONLY -->
+  <!-- invariant: AI_OUTPUT_FIDELITY -->
+  <!-- invariant: NO_SW_API_CACHE -->
 
 ## Environment Variables
 この repo で前提となる環境変数:

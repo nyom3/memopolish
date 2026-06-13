@@ -71,6 +71,8 @@ path は workspace root 基準の repository relative path で読む。
   - 仕様の正本に近い文書
 - [`docs/app-overview.md`](./app-overview.md)
   - データの流れと責務の説明
+- [`docs/invariants.yml`](./invariants.yml)
+  - repo 固有の硬い不変条件の正本
 - [`dev-instruction.md`](../dev-instruction.md)
   - ピボット背景と UX 要件
 - [`tech-stack.md`](../tech-stack.md)
