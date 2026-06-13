@@ -7,7 +7,6 @@ import { hasSupabaseAdminConfig, supabaseAdmin } from "@/lib/supabaseAdmin";
 type CleanupPayload = {
   bucketId?: string;
   writeKeyHash?: string;
-  maxPhraseCount?: number;
 };
 
 export async function POST(request: Request) {
@@ -26,10 +25,7 @@ export async function POST(request: Request) {
   }
 
   const { bucketId, writeKeyHash } = payload;
-  const maxCount =
-    typeof payload.maxPhraseCount === "number" && payload.maxPhraseCount > 0
-      ? payload.maxPhraseCount
-      : phraseMaxCount;
+  const maxCount = phraseMaxCount;
 
   if (!bucketId || !writeKeyHash) {
     return NextResponse.json(
