@@ -11,7 +11,7 @@
   severity: critical
   triggers: [保存 API 変更, Supabase insert/update 変更, DB スキーマ変更, localStorage 処理変更]
   rationale: 平文の編集キー保存は漏洩時に保存・削除権限の侵害につながる
-  check: phrases への insert / update の引数オブジェクトが write_key_hash のみを持ち、write_key 平文キーや writeKey 変数の値が混入していない
+  check: src/components/PolishForm.tsx の supabaseClient.from("phrases").insert(...) 引数オブジェクトが write_key_hash のみを持ち、write_key 平文キーや writeKey 変数の値が混入していない(現状 phrases への update 経路はなし)
   ref: docs/engineering-principles.md
 
 - id: SERVICE_ROLE_KEY_SERVER_ONLY
@@ -35,7 +35,7 @@
   severity: critical
   triggers: [AI プロンプト変更, AI モード追加, 出力整形変更, Gemini モデル変更]
   rationale: 入力にない事実や重要情報の改変はメモ内容の信頼性を壊す
-  check: fullPrompt 冒頭の事実不追加・固有名詞/数値/日付の不改変ブロックと続き生成プロンプトの同等文言が全モードで維持され、新モード追加時も同じ制約が instruction に入っている
+  check: AI モードの追加・変更 diff で modeInstruction または共通プロンプト(fullPrompt)に事実不追加・固有名詞/数値/日付の不改変制約が含まれ、既存モードの当該制約文が削除されていない
   ref: docs/engineering-principles.md
 
 - id: AI_API_BOUNDARY
@@ -67,7 +67,7 @@
   severity: normal
   triggers: [PolishForm.tsx 変更, UI 責務変更, コンポーネント分割, 大規模リファクタ]
   rationale: 中核 UI への広範な変更はレビュー困難化と回帰リスクを招く
-  check: 変更が PolishForm.tsx 内の局所差分にとどまり、src/components 配下への新規分割ファイル作成や関数の大規模な別ファイル移動・宣言順の大幅な入れ替えを伴っていない(大規模分割は別タスク)
+  check: 変更が src/components 配下への新規分割ファイル作成や、PolishForm.tsx の関数を別ファイルへ移動する大規模分割・再構成を伴っていない(大規模分割は別タスク)
   ref: AGENTS.md
 
 - id: LIMITS_STABILITY
@@ -75,5 +75,5 @@
   severity: normal
   triggers: [入力制限変更, cleanup 条件変更, 保存件数上限変更, AI API 検証変更, spec 変更]
   rationale: 制約値の変更は既存データ、UX、API 検証、cleanup 動作に影響する
-  check: phraseConstraints.ts の定数変更時に影響範囲(UI 表示 / validation / cleanup / DB)が diff かコメントで明示され、制約値が定数 import でなくマジックナンバー(2000 / 500 / 200 / 22 / 7)でハードコードされていない
+  check: phraseConstraints.ts のエクスポート定数を変更する diff で影響範囲(UI / validation / cleanup / DB)が明示され、制約値が定数 import でなく新規マジックナンバーとしてハードコードされていない
   ref: docs/ai-context.md
