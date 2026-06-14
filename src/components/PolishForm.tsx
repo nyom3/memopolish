@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import QRCode from "react-qr-code";
 
 import {
   bucketIdMinLength,
@@ -10,6 +11,7 @@ import {
   writeKeyLength,
 } from "@/lib/phraseConstraints";
 import { isValidBucketId, validatePhraseText } from "@/lib/phraseValidation";
+import { buildQrUrl, parseQrParams } from "@/lib/qrPairing";
 import { hasSupabaseConfig, supabaseClient } from "@/lib/supabaseClient";
 import { splitTextWithUrls } from "@/lib/urlText";
 
@@ -148,6 +150,7 @@ const PolishForm: React.FC<Props> = () => {
   const [infoMessage, setInfoMessage] = useState<string>("");
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [showBucket, setShowBucket] = useState<boolean>(false);
+  const [showQr, setShowQr] = useState<boolean>(false);
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
 
   const toastTimeouts = useRef<Map<string, number>>(new Map());
@@ -164,11 +167,33 @@ const PolishForm: React.FC<Props> = () => {
     }
     return trimmed !== lastSavedText.trim();
   }, [lastSavedText, text]);
+  const qrUrl = useMemo<string>(() => {
+    if (typeof window === "undefined" || !bucketId || !writeKey) {
+      return "";
+    }
+
+    return buildQrUrl({ bucketId, writeKey, baseUrl: window.location.origin });
+  }, [bucketId, writeKey]);
 
   // 初回のみ共有ルームID / 編集キーを生成して保存
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
+    }
+
+    const parsedQrParams = parseQrParams(window.location.search);
+    const hasSearchQuery = window.location.search.length > 0;
+
+    if (parsedQrParams.bucketId) {
+      localStorage.setItem(bucketStorageKey, parsedQrParams.bucketId);
+    }
+
+    if (parsedQrParams.writeKey) {
+      localStorage.setItem(writeKeyStorageKey, parsedQrParams.writeKey);
+    }
+
+    if (hasSearchQuery) {
+      window.history.replaceState(null, "", `${window.location.pathname}${window.location.hash}`);
     }
 
     const storedBucketId = localStorage.getItem(bucketStorageKey);
@@ -792,6 +817,24 @@ const PolishForm: React.FC<Props> = () => {
             <p className="text-xs text-slate-500">
               共有ルームID：同じIDの端末同士で一覧が共有されます
             </p>
+            <div className="space-y-3 border-t border-slate-100 pt-3">
+              <button
+                type="button"
+                onClick={() => setShowQr((current) => !current)}
+                className="min-h-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:border-slate-400 disabled:opacity-60"
+                disabled={!qrUrl}
+              >
+                {showQr ? "QR を隠す" : "QR を表示"}
+              </button>
+              {showQr && qrUrl && (
+                <div className="inline-flex max-w-full flex-col items-center gap-3 rounded-lg border border-slate-200 bg-white p-4">
+                  <QRCode value={qrUrl} size={200} className="h-auto max-w-full" />
+                  <p className="max-w-56 text-center text-xs leading-relaxed text-slate-500">
+                    スマホでこの QR を読むと、同じルームに接続できます
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </section>
