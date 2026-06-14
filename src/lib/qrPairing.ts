@@ -1,5 +1,4 @@
-import { writeKeyLength } from "./phraseConstraints";
-import { isValidBucketId } from "./phraseValidation";
+import { isValidBucketId, isValidWriteKey } from "./phraseValidation";
 
 const bucketParamName = "bucket";
 const writeKeyParamName = "wk";
@@ -30,6 +29,22 @@ export function parseQrParams(search: string): {
 
   return {
     bucketId: bucketId && isValidBucketId(bucketId) ? bucketId : undefined,
-    writeKey: writeKey && writeKey.length === writeKeyLength ? writeKey : undefined,
+    writeKey: writeKey && isValidWriteKey(writeKey) ? writeKey : undefined,
   };
+}
+
+export function hasQrParams(search: string): boolean {
+  const params = new URLSearchParams(search);
+
+  return params.has(bucketParamName) || params.has(writeKeyParamName);
+}
+
+export function removeQrParams(search: string): string {
+  const params = new URLSearchParams(search);
+  params.delete(bucketParamName);
+  params.delete(writeKeyParamName);
+
+  const nextSearch = params.toString();
+
+  return nextSearch ? `?${nextSearch}` : "";
 }

@@ -10,8 +10,8 @@ import {
   phraseMaxLength,
   writeKeyLength,
 } from "@/lib/phraseConstraints";
-import { isValidBucketId, validatePhraseText } from "@/lib/phraseValidation";
-import { buildQrUrl, parseQrParams } from "@/lib/qrPairing";
+import { isValidBucketId, isValidWriteKey, validatePhraseText } from "@/lib/phraseValidation";
+import { buildQrUrl, hasQrParams, parseQrParams, removeQrParams } from "@/lib/qrPairing";
 import { hasSupabaseConfig, supabaseClient } from "@/lib/supabaseClient";
 import { splitTextWithUrls } from "@/lib/urlText";
 
@@ -175,25 +175,49 @@ const PolishForm: React.FC<Props> = () => {
     return buildQrUrl({ bucketId, writeKey, baseUrl: window.location.origin });
   }, [bucketId, writeKey]);
 
+  const pushToast = useCallback((message: string, variant: ToastVariant): void => {
+    const id = crypto.randomUUID();
+    const item: ToastItem = { id, message, variant };
+    setToasts((prev) => [...prev, item]);
+
+    const timeoutId = window.setTimeout(() => {
+      setToasts((prev) => prev.filter((toast) => toast.id !== id));
+      toastTimeouts.current.delete(id);
+    }, toastDurationMs);
+    toastTimeouts.current.set(id, timeoutId);
+  }, []);
+
   // 初回のみ共有ルームID / 編集キーを生成して保存
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
     }
 
-    const parsedQrParams = parseQrParams(window.location.search);
-    const hasSearchQuery = window.location.search.length > 0;
+    const search = window.location.search;
+    const parsedQrParams = parseQrParams(search);
+    const hasQrAttempt = hasQrParams(search);
+    const hasCompleteQrParams = Boolean(parsedQrParams.bucketId && parsedQrParams.writeKey);
 
-    if (parsedQrParams.bucketId) {
+    if (hasCompleteQrParams && parsedQrParams.bucketId && parsedQrParams.writeKey) {
       localStorage.setItem(bucketStorageKey, parsedQrParams.bucketId);
-    }
-
-    if (parsedQrParams.writeKey) {
       localStorage.setItem(writeKeyStorageKey, parsedQrParams.writeKey);
     }
 
-    if (hasSearchQuery) {
-      window.history.replaceState(null, "", `${window.location.pathname}${window.location.hash}`);
+    if (hasQrAttempt) {
+      const nextSearch = removeQrParams(search);
+      window.history.replaceState(
+        null,
+        "",
+        `${window.location.pathname}${nextSearch}${window.location.hash}`,
+      );
+    }
+
+    if (hasQrAttempt && !hasCompleteQrParams) {
+      queueMicrotask(() => {
+        const message = "QRコードの読み取りに失敗しました。";
+        setErrorMessage(message);
+        pushToast(message, "error");
+      });
     }
 
     const storedBucketId = localStorage.getItem(bucketStorageKey);
@@ -208,7 +232,7 @@ const PolishForm: React.FC<Props> = () => {
 
     const storedWriteKey = localStorage.getItem(writeKeyStorageKey);
     const nextWriteKey =
-      storedWriteKey && storedWriteKey.length >= writeKeyLength
+      storedWriteKey && isValidWriteKey(storedWriteKey)
         ? storedWriteKey
         : generateRandomId(writeKeyLength);
 
@@ -222,7 +246,7 @@ const PolishForm: React.FC<Props> = () => {
       setWriteKey(nextWriteKey);
       setWriteKeyInput(nextWriteKey);
     });
-  }, []);
+  }, [pushToast]);
 
   // 編集キーが変わったらハッシュを更新
   useEffect(() => {
@@ -260,18 +284,6 @@ const PolishForm: React.FC<Props> = () => {
   const resetMessages = (): void => {
     setErrorMessage("");
     setInfoMessage("");
-  };
-
-  const pushToast = (message: string, variant: ToastVariant): void => {
-    const id = crypto.randomUUID();
-    const item: ToastItem = { id, message, variant };
-    setToasts((prev) => [...prev, item]);
-
-    const timeoutId = window.setTimeout(() => {
-      setToasts((prev) => prev.filter((toast) => toast.id !== id));
-      toastTimeouts.current.delete(id);
-    }, toastDurationMs);
-    toastTimeouts.current.set(id, timeoutId);
   };
 
   const getApiErrorMessage = (status: number, fallback: string): string => {
@@ -318,7 +330,7 @@ const PolishForm: React.FC<Props> = () => {
       setIsFetching(false);
       return true;
     },
-    [],
+    [pushToast],
   );
 
   useEffect(() => {
@@ -626,9 +638,10 @@ const PolishForm: React.FC<Props> = () => {
 
   const handleApplyWriteKey = async (): Promise<void> => {
     const trimmed = writeKeyInput.trim();
-    if (trimmed.length === 0) {
-      setErrorMessage("編集キーを入力してください。");
-      pushToast("編集キーを入力してください。", "error");
+    if (!isValidWriteKey(trimmed)) {
+      const message = `編集キーは${writeKeyLength}文字以上で入力してください。`;
+      setErrorMessage(message);
+      pushToast(message, "error");
       return;
     }
 
