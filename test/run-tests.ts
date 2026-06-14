@@ -1,5 +1,6 @@
 import { phraseValidationTests } from "./phraseValidation.test.ts";
 import { keepaliveTests } from "./keepalive.test.ts";
+import { qrPairingTests } from "./qrPairing.test.ts";
 import { urlTextTests } from "./urlText.test.ts";
 
 type TestCase = {
@@ -7,7 +8,12 @@ type TestCase = {
   run: () => void;
 };
 
-const tests: TestCase[] = [...phraseValidationTests, ...keepaliveTests, ...urlTextTests];
+const tests: TestCase[] = [
+  ...phraseValidationTests,
+  ...keepaliveTests,
+  ...qrPairingTests,
+  ...urlTextTests,
+];
 
 let passed = 0;
 

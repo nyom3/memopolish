@@ -4,10 +4,12 @@ import {
   bucketIdMinLength,
   extraInstructionMaxLength,
   phraseMaxLength,
+  writeKeyLength,
 } from "../src/lib/phraseConstraints.ts";
 import {
   isSha256Hex,
   isValidBucketId,
+  isValidWriteKey,
   validateExtraInstruction,
   validatePhraseText,
 } from "../src/lib/phraseValidation.ts";
@@ -26,6 +28,14 @@ export const phraseValidationTests: Array<{ name: string; run: () => void }> = [
       assert.equal(isSha256Hex("a".repeat(64)), true);
       assert.equal(isSha256Hex("g".repeat(64)), false);
       assert.equal(isSha256Hex("a".repeat(63)), false);
+    },
+  },
+  {
+    name: "isValidWriteKey は最小文字数以上で true を返す",
+    run: () => {
+      assert.equal(isValidWriteKey("w".repeat(writeKeyLength - 1)), false);
+      assert.equal(isValidWriteKey("w".repeat(writeKeyLength)), true);
+      assert.equal(isValidWriteKey("w".repeat(writeKeyLength + 1)), true);
     },
   },
   {
