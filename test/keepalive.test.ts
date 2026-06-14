@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 
-import { buildKeepaliveResponse } from "../src/lib/keepalive.ts";
+import {
+  buildKeepaliveResponse,
+  isKeepaliveAuthorized,
+} from "../src/lib/keepalive.ts";
 
 export const keepaliveTests: Array<{ name: string; run: () => void }> = [
   {
@@ -30,6 +33,34 @@ export const keepaliveTests: Array<{ name: string; run: () => void }> = [
           body: { ok: false },
           status: 500,
         },
+      );
+    },
+  },
+  {
+    name: "isKeepaliveAuthorized は token 未設定時に許可する",
+    run: () => {
+      assert.equal(
+        isKeepaliveAuthorized({ authorizationHeader: null, token: undefined }),
+        true,
+      );
+    },
+  },
+  {
+    name: "isKeepaliveAuthorized は token 設定時に Bearer token を要求する",
+    run: () => {
+      assert.equal(
+        isKeepaliveAuthorized({
+          authorizationHeader: "Bearer expected-token",
+          token: "expected-token",
+        }),
+        true,
+      );
+      assert.equal(
+        isKeepaliveAuthorized({
+          authorizationHeader: "Bearer wrong-token",
+          token: "expected-token",
+        }),
+        false,
       );
     },
   },

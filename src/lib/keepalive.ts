@@ -12,6 +12,20 @@ type BuildKeepaliveResponseParams = {
   hasQueryError?: boolean;
 };
 
+export function isKeepaliveAuthorized({
+  authorizationHeader,
+  token,
+}: {
+  authorizationHeader: string | null;
+  token?: string;
+}): boolean {
+  if (!token) {
+    return true;
+  }
+
+  return authorizationHeader === `Bearer ${token}`;
+}
+
 export function buildKeepaliveResponse({
   hasConfig,
   hasQueryError = false,

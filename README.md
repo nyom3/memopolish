@@ -31,6 +31,9 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
 SUPABASE_URL=YOUR_SUPABASE_URL
 SUPABASE_SERVICE_ROLE_KEY=YOUR_SUPABASE_SERVICE_ROLE_KEY
 
+# 任意: keep-alive API を Bearer token で保護する
+KEEPALIVE_TOKEN=YOUR_KEEPALIVE_TOKEN
+
 # Gemini API
 GEMINI_API_KEY=YOUR_GEMINI_API_KEY
 ```
@@ -66,12 +69,13 @@ Supabase 無料プロジェクトの pause 回避用に、`GET /api/keepalive` �
 この API は anon key の `supabaseClient` で `phrases` を 1 件だけ読み取り、成功時に `{ "ok": true }` を返します。service role は使いません。
 
 GitHub Actions の `.github/workflows/keepalive.yml` は日次 cron と手動実行に対応しています。  
-Repository Variables または Repository Secrets に `KEEPALIVE_URL` を設定してください。
+Repository Secrets に `KEEPALIVE_URL` を設定してください。任意で `KEEPALIVE_TOKEN` を設定すると、workflow は `Authorization: Bearer ...` を付けて呼び出します。
 
 例:
 
 ```text
 KEEPALIVE_URL=https://your-production-domain.example
+KEEPALIVE_TOKEN=your-random-token
 ```
 
 ## PWA 確認手順
