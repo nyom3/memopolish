@@ -1,0 +1,25 @@
+name: Supabase keep-alive
+
+on:
+  schedule:
+    - cron: "17 0 * * *"
+    - cron: "17 12 * * *"
+  workflow_dispatch:
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call keep-alive endpoint
+        env:
+          KEEPALIVE_URL: ${{ secrets.KEEPALIVE_URL }}
+          KEEPALIVE_TOKEN: ${{ secrets.KEEPALIVE_TOKEN }}
+        run: |
+          test -n "$KEEPALIVE_URL"
+          if [ -n "$KEEPALIVE_TOKEN" ]; then
+            curl --fail --show-error --silent \
+              --header "Authorization: Bearer $KEEPALIVE_TOKEN" \
+              "$KEEPALIVE_URL/api/keepalive"
+          else
+            curl --fail --show-error --silent "$KEEPALIVE_URL/api/keepalive"
+          fi
