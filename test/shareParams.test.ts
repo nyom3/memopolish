@@ -20,14 +20,26 @@ export const shareParamsTests: Array<{ name: string; run: () => void }> = [
     },
   },
   {
-    name: "formatSharedText は text に含まれる url を重複追加しない",
+    name: "formatSharedText は url と完全一致する値を重複追加しない",
     run: () => {
       assert.equal(
         formatSharedText({
-          text: "詳細 https://example.com を確認",
+          text: "https://example.com",
           url: "https://example.com",
         }),
-        "詳細 https://example.com を確認",
+        "https://example.com",
+      );
+    },
+  },
+  {
+    name: "formatSharedText は部分一致する別 URL を誤って捨てない",
+    run: () => {
+      assert.equal(
+        formatSharedText({
+          title: "See https://example.com/category",
+          url: "https://example.com",
+        }),
+        "See https://example.com/category\n\nhttps://example.com",
       );
     },
   },

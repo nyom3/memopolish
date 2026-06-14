@@ -134,7 +134,7 @@ const renderTextWithLinks = (value: string): ReactNode => {
 };
 
 const PolishForm: React.FC<Props> = ({ initialText = "" }) => {
-  const [text, setText] = useState<string>("");
+  const [text, setText] = useState<string>(initialText);
   const [lastSavedText, setLastSavedText] = useState<string>("");
   const [bucketId, setBucketId] = useState<string>("");
   const [bucketInput, setBucketInput] = useState<string>("");
@@ -149,7 +149,9 @@ const PolishForm: React.FC<Props> = ({ initialText = "" }) => {
   const [isPolishing, setIsPolishing] = useState<boolean>(false);
   const [isFetching, setIsFetching] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
-  const [infoMessage, setInfoMessage] = useState<string>("");
+  const [infoMessage, setInfoMessage] = useState<string>(
+    initialText ? "共有された内容を入力欄に読み込みました。" : "",
+  );
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [showBucket, setShowBucket] = useState<boolean>(false);
   const [showQr, setShowQr] = useState<boolean>(false);
@@ -282,19 +284,6 @@ const PolishForm: React.FC<Props> = ({ initialText = "" }) => {
   useEffect(() => {
     phraseInputRef.current?.focus();
   }, []);
-
-  useEffect(() => {
-    if (!initialText) {
-      return;
-    }
-
-    queueMicrotask(() => {
-      setText(initialText);
-      setLastSavedText("");
-      setPolishedText("");
-      setInfoMessage("共有された内容を入力欄に読み込みました。");
-    });
-  }, [initialText]);
 
   const resetMessages = (): void => {
     setErrorMessage("");

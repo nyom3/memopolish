@@ -34,7 +34,7 @@ export function formatSharedText({
     parts.push(text);
   }
 
-  if (url && !parts.some((part) => part.includes(url))) {
+  if (url && !parts.some((part) => part === url)) {
     parts.push(url);
   }
 
