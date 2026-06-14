@@ -102,6 +102,7 @@ AI 加工（推敲 / 敬語化 / 要点抽出）は任意機能で、通常の�
   - request: `{ text, mode, extraInstruction? }`
   - `text` は 2000 文字以内、`extraInstruction` は 500 文字以内
   - mode: `polish | keigo | keypoints`
+  - `x-vercel-forwarded-for` / `x-real-ip` を使う IP ベースの簡易レート制限を行い、上限超過時は 429 と日本語エラーを返す
 - `POST /api/phrases/delete`（削除）
 - `POST /api/phrases/cleanup`（200件整理）
 

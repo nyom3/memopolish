@@ -177,6 +177,36 @@ Supabase や Gemini の実接続確認ができない場合は、その旨を明
   <!-- invariant: AI_OUTPUT_FIDELITY -->
   <!-- invariant: NO_SW_API_CACHE -->
 
+## Review Setup
+
+このリポジトリの Claude コードレビューの effort は `docs/review.yml` で管理する。
+
+```yaml
+effort: fast   # fast | standard
+```
+
+- `fast` — Claude がインラインで diff を読み判断（agent 不使用、~20-40k tokens）
+- `standard` — 3 finder agents + verifier agents（~70-100k tokens）
+- セキュリティ境界・認証・削除系の変更のみ bundled `/code-review`（thorough、~250k+）を使用
+
+新しいリポジトリでこのレビューフローを使う場合は `docs/review.yml` を追加するだけでよい。
+skill 本体は `E:\apps\.agents\skills\code-review\SKILL.md` にワークスペース共通で置いてある。
+
+## PR Review Monitoring
+
+この repo では、PR 作成後と push 更新後に Claude review の監視を行う。
+
+- PR 作成直後に repo root の `.review-inbox` へ PR 番号を書き込む
+- push して PR を更新した後も、同じ PR 番号を `.review-inbox` へ再度書き込む
+- GitHub コメントを確認し、`claude-review` を含む最新コメントがあれば内容を読んで対応する
+- 指摘に対応したら `npm test` / `npm run lint` / `npm run build` を実行する
+- 対応コミットを push したら、再度 `.review-inbox` を更新する
+- 監視は原則 5 分おき、最大 8 回まで行う
+- `LGTM` または対応不要が確認できたら完了とする
+- 最大回数に達した場合は、未完了として状況を報告する
+
+`.review-inbox` はローカル連携用ファイルであり、git 管理に含めない。
+
 ## Environment Variables
 この repo で前提となる環境変数:
 

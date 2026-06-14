@@ -1,6 +1,7 @@
 import { phraseValidationTests } from "./phraseValidation.test.ts";
 import { keepaliveTests } from "./keepalive.test.ts";
 import { qrPairingTests } from "./qrPairing.test.ts";
+import { rateLimitTests } from "./rateLimit.test.ts";
 import { shareParamsTests } from "./shareParams.test.ts";
 import { urlTextTests } from "./urlText.test.ts";
 
@@ -13,6 +14,7 @@ const tests: TestCase[] = [
   ...phraseValidationTests,
   ...keepaliveTests,
   ...qrPairingTests,
+  ...rateLimitTests,
   ...shareParamsTests,
   ...urlTextTests,
 ];
