@@ -34,7 +34,9 @@ type ApiResponse = {
   error?: string;
 };
 
-type Props = Record<string, never>;
+type Props = {
+  initialText?: string;
+};
 
 type ToastVariant = "success" | "error";
 
@@ -131,7 +133,7 @@ const renderTextWithLinks = (value: string): ReactNode => {
   return nodes;
 };
 
-const PolishForm: React.FC<Props> = () => {
+const PolishForm: React.FC<Props> = ({ initialText = "" }) => {
   const [text, setText] = useState<string>("");
   const [lastSavedText, setLastSavedText] = useState<string>("");
   const [bucketId, setBucketId] = useState<string>("");
@@ -280,6 +282,19 @@ const PolishForm: React.FC<Props> = () => {
   useEffect(() => {
     phraseInputRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    if (!initialText) {
+      return;
+    }
+
+    queueMicrotask(() => {
+      setText(initialText);
+      setLastSavedText("");
+      setPolishedText("");
+      setInfoMessage("共有された内容を入力欄に読み込みました。");
+    });
+  }, [initialText]);
 
   const resetMessages = (): void => {
     setErrorMessage("");

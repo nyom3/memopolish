@@ -40,3 +40,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 docs/secret-rotation-vercel-2026-04.md
+
+# local dev automation (not part of app)
+.dev-scripts/
+.review-inbox
