@@ -34,7 +34,9 @@ type ApiResponse = {
   error?: string;
 };
 
-type Props = Record<string, never>;
+type Props = {
+  initialText?: string;
+};
 
 type ToastVariant = "success" | "error";
 
@@ -131,8 +133,8 @@ const renderTextWithLinks = (value: string): ReactNode => {
   return nodes;
 };
 
-const PolishForm: React.FC<Props> = () => {
-  const [text, setText] = useState<string>("");
+const PolishForm: React.FC<Props> = ({ initialText = "" }) => {
+  const [text, setText] = useState<string>(initialText);
   const [lastSavedText, setLastSavedText] = useState<string>("");
   const [bucketId, setBucketId] = useState<string>("");
   const [bucketInput, setBucketInput] = useState<string>("");
@@ -147,7 +149,9 @@ const PolishForm: React.FC<Props> = () => {
   const [isPolishing, setIsPolishing] = useState<boolean>(false);
   const [isFetching, setIsFetching] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
-  const [infoMessage, setInfoMessage] = useState<string>("");
+  const [infoMessage, setInfoMessage] = useState<string>(
+    initialText ? "共有された内容を入力欄に読み込みました。" : "",
+  );
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [showBucket, setShowBucket] = useState<boolean>(false);
   const [showQr, setShowQr] = useState<boolean>(false);

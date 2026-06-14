@@ -110,6 +110,8 @@ AI 加工（推敲 / 敬語化 / 要点抽出）は任意機能で、通常の�
 - `public/manifest.webmanifest` と `public/sw.js` を使用
 - アプリシェルと静的アセットのみキャッシュ
 - API レスポンスはキャッシュしない
+- Web Share Target として `/share` を提供し、共有された title / text / url を入力欄に読み込む
+- 共有クエリは読み込み後に URL から除去し、`/share` は Service Worker の追加キャッシュ対象にしない
 
 ## 11. 制約
 
