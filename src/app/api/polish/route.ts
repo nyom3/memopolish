@@ -2,8 +2,18 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 import { validateExtraInstruction, validatePhraseText } from "@/lib/phraseValidation";
+import {
+  checkRateLimit,
+  getTrustedClientIp,
+  polishRateLimitMaxRequests,
+  polishRateLimitWindowMs,
+  pruneExpiredRateLimitBuckets,
+  type RateLimitBucket,
+} from "@/lib/rateLimit";
 
 const geminiApiKey = process.env.GEMINI_API_KEY ?? "";
+const polishRateLimitBuckets = new Map<string, RateLimitBucket>();
+let polishRateLimitLastPrunedAt = 0;
 
 type PolishMode = "polish" | "keigo" | "keypoints";
 
@@ -61,6 +71,43 @@ export async function POST(request: Request) {
             error: extraInstructionValidationError,
           },
           { status: 400 }
+        );
+      }
+    }
+
+    const now = Date.now();
+    if (now - polishRateLimitLastPrunedAt >= polishRateLimitWindowMs) {
+      const activeBuckets = pruneExpiredRateLimitBuckets({
+        entries: [...polishRateLimitBuckets.entries()],
+        now,
+        windowMs: polishRateLimitWindowMs,
+      });
+      polishRateLimitBuckets.clear();
+      for (const [ip, bucket] of activeBuckets) {
+        polishRateLimitBuckets.set(ip, bucket);
+      }
+      polishRateLimitLastPrunedAt = now;
+    }
+
+    const clientIp = getTrustedClientIp(request.headers);
+    if (clientIp) {
+      const rateLimitResult = checkRateLimit({
+        currentBucket: polishRateLimitBuckets.get(clientIp),
+        maxRequests: polishRateLimitMaxRequests,
+        now,
+        windowMs: polishRateLimitWindowMs,
+      });
+      polishRateLimitBuckets.set(clientIp, rateLimitResult.bucket);
+
+      if (!rateLimitResult.allowed) {
+        return NextResponse.json(
+          { error: "AI加工の利用回数が一時的に上限に達しました。しばらくして再試行してください。" },
+          {
+            headers: {
+              "Retry-After": String(rateLimitResult.retryAfterSeconds),
+            },
+            status: 429,
+          }
         );
       }
     }
