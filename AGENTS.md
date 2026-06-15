@@ -196,13 +196,10 @@ skill 本体は `E:\apps\.agents\skills\code-review\SKILL.md` にワークスペ
 
 この repo では、PR 作成後と push 更新後に Claude review の監視を行う。
 
-- PR 作成直後に repo root の `.review-inbox` へ PR 番号を書き込む
-- push して PR を更新した後も、同じ PR 番号を `.review-inbox` へ再度書き込む
-- GitHub コメントを確認し、`claude-review` を含む最新コメントがあれば内容を読んで対応する
-- 指摘に対応したら `npm test` / `npm run lint` / `npm run build` を実行する
-- 対応コミットを push したら、再度 `.review-inbox` を更新する
-- 監視は原則 5 分おき、最大 8 回まで行う
-- `LGTM` または対応不要が確認できたら完了とする
+- PR 作成直後にワークスペースの `.review-inbox`（`E:/apps/.review-inbox`）へ PR URL を書き込む
+- GitHub コメントを 5 分おき・最大 8 回確認する（このポーリング中は `.review-inbox` を更新しない）
+- `claude-review-lgtm` を検知 → 完了として終了
+- `claude-review-pending` を検知 → 指摘に対応し `npm test` / `npm run lint` / `npm run build` を実行 → push → `.review-inbox` へ PR URL を再度書き込む → ポーリングを再開
 - 最大回数に達した場合は、未完了として状況を報告する
 
 `.review-inbox` はローカル連携用ファイルであり、git 管理に含めない。
